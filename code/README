@@ -1,0 +1,7 @@
+This directory is used to store project codes.
+
+project:
+  
+  1. crawler. crawl wav files from website.
+  
+  2. ASR. Audio scene recognization.

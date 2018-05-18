@@ -1,0 +1,1 @@
+1. I have changed the source code of librosa at core.stft() function, changed the deafault value of center into False.
