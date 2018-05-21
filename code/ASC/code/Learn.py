@@ -290,6 +290,9 @@ class Train(builtins.object):
     return a instance that can caculate kinds of audio features,
     this class just can handle with 16000hz and mono wav files.
     
+    parameters:
+        cfg : string, config file path
+
     attributes(vars):
         _with_statistics : 
         _config : 
@@ -1447,7 +1450,10 @@ class Train(builtins.object):
 
         return es_powerlist_ranking, em_powerlist_ranking, hs_powerlist_ranking, hm_powerlist_ranking, sp_powerlist_ranking
 
-
+    def _cross_validation(self):
+        """
+        """
+        pass
 
 
 
