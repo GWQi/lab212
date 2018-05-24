@@ -18,7 +18,7 @@ import pickle
 from tools.readlabel import readlabel
 from Config import Config
 from sklearn.mixture import GaussianMixture
-from scipy.integrate import quad
+from scipy import stats
 
 class Power(object):
     """
@@ -29,14 +29,16 @@ class Power(object):
         speech : np.ndarray, shape=(n_segments,), the feature statistics of speech audio
         music : np.ndarray, shape=(m_segments,), the feature statistics of music audio
         logger : training logger instance
-        n_components : int, the number of mixture components to fit statistics, default is 5
         free : bool, default is Ture, weather to free speech and music statistics and corresponding
-               gmm after everything is done.
+               kde after everything is done.
 
     attributes(vars):
         name_ :
         speech_ :
         music_ :
+
+        _speech_kde :
+        _music_kde :
     
         _logger : logger instance must be freed after everything is done, otherwise the instance of Power can't be writed on disk by pickle
         _speech_position :
@@ -45,7 +47,7 @@ class Power(object):
         extreme_speech_left_ :
         extreme_speech_right_ :
         extreme_music_left_ = :
-        extreme_music__speech_gmmright_ :
+        extreme_music_right_ :
 
         high_speech_ :
         high_music_ :
@@ -65,7 +67,7 @@ class Power(object):
         
 
     """
-    def __init__(self, name, speech, music, logger, n_components=5, free=True):
+    def __init__(self, name, speech, music, logger, free=True):
         super(Power, self).__init__()
 
         self._free = free
@@ -74,9 +76,9 @@ class Power(object):
         self.speech_ = speech
         self.music_ = music
 
-        # model the speech, music statistics using GMM
-        self._speech_gmm = GaussianMixture(n_components=n_components).fit(self.speech_.reshape(-1,1))
-        self._music_gmm = GaussianMixture(n_components=n_components).fit(self.music_.reshape(-1,1))
+        # model the speech, music statistics using gaussian kernel function
+        self._speech_kde = stats.gaussian_kde(self.speech_)
+        self._music_kde = stats.gaussian_kde(self.music_)
 
         speech_mean = self.speech_.mean()
         music_mean = self.music_.mean()
@@ -140,15 +142,15 @@ class Power(object):
             gc.collect()
             self.music_ = None
 
-            # free speech gmm
-            del self._speech_gmm
+            # free speech kde
+            del self._speech_kde
             gc.collect()
-            self._speech_gmm = None
+            self._speech_kde = None
 
-            # free music gmm
-            del self._music_gmm
+            # free music kde
+            del self._music_kde
             gc.collect()
-            self._music_gmm = None
+            self._music_kde = None
 
             # free logger
             del self._logger
@@ -179,13 +181,13 @@ class Power(object):
             self.extreme_music_left_ = speech_min
 
         # *******************compute the high probabilyty thresholds**************
-        # compute the log probility of number between min(speech_min, music_min) and max(speech_max, music_max), step length is (max(speech_max, music_max) - min(speech_min, music_min)) / 1000
+        # compute the probility of number between min(speech_min, music_min) and max(speech_max, music_max), step length is (max(speech_max, music_max) - min(speech_min, music_min)) / 1000
         numbers = np.arange(min(speech_min, music_min), max(speech_max, music_max), (max(speech_max, music_max) - min(speech_min, music_min)) / 1000)
-        speech_log_prob = self._speech_gmm.score_samples(numbers.reshape(-1,1))
-        music_log_prob = self._music_gmm.score_samples(numbers.reshape(-1,1))
+        speech_prob = self._speech_kde(numbers)
+        music_prob = self._music_kde(numbers)
 
-        # compute the log prob difference between speech and music by subtracting music_log_prob from music_log_prob
-        prob_diff = speech_log_prob - music_log_prob
+        # compute the prob difference between speech and music by subtracting music_prob from speech_prob
+        prob_diff = speech_prob - music_prob
 
         # the max value of prob_diff is high probility speech threshold point where where the difference between the
         # height of the speech PDF and the height of the music PDF is maximal; the min value of prob_diff is high
@@ -271,11 +273,11 @@ class Power(object):
             # use the log probability instead of directly probability
             # here may be changed, change np.inf ot max(self._speech_max,
             # self._music_max), change -np.inf to min(self._speech_min, self._music_min)
-            speech_decision_error = quad(lambda x: self._speech_gmm.score_samples(x), a, np.inf)[0]
-            music_decision_error = quad(lambda x: self._music_gmm.score_samples(x), -np.inf, a)[0]
+            speech_decision_error = self._speech_kde.integrate_box_1d(a, np.inf)
+            music_decision_error = self._music_kde.integrate_box_1d(-np.inf, a)
         else:
-            speech_decision_error = quad(lambda x: self._speech_gmm.score_samples(x), -np.inf, a)[0]
-            music_decision_error = quad(lambda x: self._music_gmm.score_samples(x), a, np.inf)[0]
+            speech_decision_error = self._speech_kde.integrate_box_1d(-np.inf, a)
+            music_decision_error = self._music_kde.integrate_box_1d(a, np.inf)
 
         joint_decision_error = 0.5 * (speech_decision_error + music_decision_error)
 
@@ -466,9 +468,6 @@ class Train(builtins.object):
 
         # get model file basename, if None, default is model
         self._model_name = self._config.get('model_name', 'model')
-
-        # get the gmm components number, default is 5
-        self._n_components = int(self._config.get('n_components', 5))
 
         # get the weighting factors determin the contributions of separation power and mutual correlation
         self._alpha = float(self._config.get('alpha', 0.5))
@@ -1162,7 +1161,7 @@ class Train(builtins.object):
         self._logger.info("Starting computing threshold separation power!")
         for name in self._statistics_column_values:
             self._logger.info("Computing threshold separation power for feature: {}!".format(name))
-            power_list.append(Power(name, speech[name].values, music[name].values, self._logger, n_components=self._n_components))
+            power_list.append(Power(name, speech[name].values, music[name].values, self._logger))
         self._logger.info("Compute threshold separation power done!")
 
         # save power list
