@@ -9,6 +9,7 @@ import sys
 import getopt
 
 import pandas as pd
+import numpy as np
 
 
 
@@ -80,6 +81,7 @@ class Test(object):
         self._n_fft = self.setting['n_fft']
         self._mfcc_order = self.setting['mfcc_order']
         self._roll_percent = self.setting['roll_percent']
+
 
         # statistics columns names
         self._statistics_column_values = ['ste_mean', 'ste_std', 'ste_mean_diff', 'ste_std_diff',
@@ -628,8 +630,70 @@ class Test(object):
         perform segmentation of a given audio signal's feature statistics dataframe into “speech” and “music”.
 
         parameters:
-            
+            feature_statistics_df : pandas.DataFrame, shape=(n_segments, m_features)
+        
+        return : list of string, shape=(n_segments,), 'music' or 'speech'
         """
+
+        # the best n features for extreme speech threshold and its corresponding extrem speech threshold
+        es_features = [power.name_ for power in self.es_ranking_list[0:self.setting['n_es_features']]]
+        es_thresholds_left = np.array([power.extreme_speech_left_ for power in self.es_ranking_list[0:self.setting['n_es_features']]])
+        es_thresholds_right = np.array([power.extreme_speech_right_ for power in self.es_ranking_list[0:self.setting['n_es_features']]])
+
+        # the best n features for extreme music threshold and its corresponding extrem music threshold
+        em_features = [power.name_ for power in self.em_ranking_list[0:self.setting['n_em_features']]]
+        em_thresholds_left = np.array([power.extreme_music_left_ for power in self.em_ranking_list[0:self.setting['n_em_features']]])
+        em_thresholds_right = np.array([power.extreme_music_right_ for power in self.em_ranking_list[0:self.setting['n_em_features']]])
+
+        # the best n features for high probibality speech threshold and its corresponding high propability speech threshold
+        hs_features = [power.name_ for power in self.hs_ranking_list[0:self.setting['n_hs_features']]]
+        hs_thresholds = np.array([power.high_speech_ for power in self.hs_ranking_list[0:self.setting['n_hs_features']]])
+
+        # the best n features for high probibality music threshold and its corresponding high propability music threshold
+        hm_features = [power.name_ for power in self.hm_ranking_list[0:self.setting['n_hm_features']]]
+        hm_thresholds = np.array(power.hm_threshold_ for power in self.hm_ranking_list[0:self.setting['n_hm_features']])
+
+        # the best n features for separation threshold and its corresponding separation threshold
+        sp_features = [power.name_ for power in self.sp_ranking_list[0:self.setting['n_sp_features']]]
+        sp_thresholds = np.array(power.separation_ for power in self.sp_ranking_list[0:self.setting['n_sp_features']])
+
+        # the indices at which the segments haven't been segmented
+        unsegmented_indices = list(range(feature_statistics_df.count()[0]))
+
+        # initial classification label
+        label = [0.0] * feature_statistics_df.count()[0]
+
+        # initialize the alpha, mentioned at page 9 of the paper
+        alpha = 0.5
+
+        # number of features above its corresponding extrem speech threshold
+        S_ex_left = np.where((feature_statistics_df[es_features].values - es_thresholds_left) < 0, 1, 0)
+        S_ex_right = np.where((feature_statistics_df[es_features].values - es_thresholds_right) > 0, 1, 0)
+        S_ex = np.sum(S_ex_left + S_ex_right, axis=-1)
+
+        # number of features above its corresponding extrem music threshold
+        M_ex_left = np.where((feature_statistics_df[em_features].values - em_thresholds_left) < 0, 1, 0)
+        M_ex_right = np.where((feature_statistics_df[em_features].values - em_thresholds_right) > 0, 1, 0)
+        M_ex = np.sum(M_ex_left, M_ex_right, axis=-1)
+
+        # excute (ii) for speech first, find the indices where the segments satisfy Sx > 1 and Mx = 0
+        condition_Sx = np.where(S_ex > 1, 1, 0) # if the segment satify Sx > 1, set 1, otherwise 0
+        condition_Mx = np.where(M_ex == 0, 1, 0)
+        indices = np.where((condition_Sx * condition_Mx) == 1)[0]
+
+        # set the segments whose indice is in indices to 1, indicate it belongs to speech
+        if len(indices) != 0:
+            label[[indices]] = 1.0
+            for i in indices:
+                unsegmented_indices.remove(i)
+
+        # excute
+
+
+
+
+    def _segmentation_help(self, )
+
 
 
 

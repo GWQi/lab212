@@ -33,12 +33,12 @@ class Power(object):
                kde after everything is done.
 
     attributes(vars):
-        name_ :
-        speech_ :
-        music_ :
+        name_ : string, the name of this feature statistics
+        speech_ : np.ndarray, shape=(n_segments), speech statistics data
+        music_ : np.ndarray, shape=(m_segments), music statistics data
 
-        _speech_kde :
-        _music_kde :
+        _speech_kde : the kernel density function estimator of speech statistics
+        _music_kde : the kernel density function estimator of music statistics
     
         _logger : logger instance must be freed after everything is done, otherwise the instance of Power can't be writed on disk by pickle
         _speech_position :
