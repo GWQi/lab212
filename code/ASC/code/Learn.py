@@ -159,7 +159,6 @@ class Power(object):
 
 
 
-
     def _thresholds(self):
         """
         compute the extreme(high) speech(music) thresholds
