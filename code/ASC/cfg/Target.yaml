@@ -1,12 +1,12 @@
 log_file_path:
 
+with_statistics:
+
 wav_path:
 
 feature_path:
 
-with_statistics:
-
-labels_directory:
+labels_path:
 
 average_period: 5
 

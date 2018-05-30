@@ -181,19 +181,61 @@ class Test(object):
                                     level=logging.DEBUG)
                 self.logger = logging.getLogger('Testing procession')
 
-        # check source data files path
-        if self.config.get('source_data_path', None) == None:
-            raise ValueError("Please give a correct data files path in cfg file: {}".format(cfg))
-
-        if not os.path.exists(self.config['source_data_path']):
-            raise ValueError("Source data files path does not exist!: {}".format(elf.config['source_data_path']))
-
-        # check labels file directory
-        if self.config.get('labels_directory', None) == None:
-            if os.path.isfile(self.config['source_data_path']):
-                self.config['labels_directory'] = os.path.basedir(self.config['source_data_path'])
+        # tag with statistics files
+        if self.config.get('with_statistics', None) == True:
+            # if tag the file using features, then check the feature files directory
+            if self.config.get('feature_path', None) == None:
+                raise ValueError("Tag with statistics, but you don't give the statistics file path, please set statistics path!")
+            if not os.path.exists(self.config['feature_path']):
+                raise ValueError("Tag with statistics, but the statistics path you give doesn't exist: {}, please check!".format(self.config['feature_path']))
+            
+            # check labels file directory, if not given, set it same as feature files path, if given bu doesn't exist, create it
+            if self.config.get('labels_path', None) == None:
+                if os.path.isfile(self.config['feature_path']):
+                    self.config['labels_path'] = os.path.basedir(self.config['feature_path'])
+                else:
+                    self.config['labels_path'] = self.config['feature_path']
             else:
-                self.config['labels_directory'] = self.config['source_data_path']
+                if not os.path.exists(self.config['labels_path']):
+                    try:
+                        os.makedirs(self.config['labels_path'])
+                    except Exception as e:
+                        raise(e)
+
+        # tag with wav files
+        else:
+            # check source data files path
+            if self.config.get('wav_path', None) == None:
+                raise ValueError("Please give a correct data files path in cfg file: {}".format(cfg))
+
+            if not os.path.exists(self.config['wav_path']):
+                raise ValueError("Source data files path does not exist!: {}".format(elf.config['wav_path']))
+            
+            # check statistics files path, if not given, set it same as wave files path, if given bu doesn't exist, create it
+            if self.config.get('feature_path', None) == None:
+                if os.path.isfile(self.config['wav_path']):
+                    self.config['feature_path'] = os.path.basedir(self.config['wav_path'])
+                else:
+                    self.config['feature_path'] = self.config['wav_path']
+            else:
+                if not os.path.exists(self.config['feature_path']):
+                    try:
+                        os.makedirs(self.config['feature_path'])
+                    except Exception as e:
+                        raise(e)
+
+            # check labels file directory
+            if self.config.get('labels_path', None) == None:
+                if os.path.isfile(self.config['wav_path']):
+                    self.config['labels_path'] = os.path.basedir(self.config['wav_path'])
+                else:
+                    self.config['labels_path'] = self.config['wav_path']
+            else:
+                if not os.path.exists(self.config['labels_path']):
+                    try:
+                        os.makedirs(self.config['labels_path'])
+                    except Exception as e:
+                        raise(e)
 
         # check smoothing parameters
         if self.config.get('average_period', None) == None:
@@ -684,6 +726,9 @@ class Test(object):
 
         return feature_statistics_df
 
+    def 
+
+
 
     def _segmentation(self, feature_statistics_df):
         """
@@ -765,7 +810,11 @@ class Test(object):
         return Db
 
 
-
+    def tag(self):
+        """
+        this function can be called to tag files
+        """
+        
 
 
 
@@ -797,16 +846,6 @@ class Test(object):
         else:
             resault = 1.0 * (Sp - Mp) / self.setting['n_sp_features']
             return resault
-
-
-
-
-    def _segmentation_help(self):
-        pass
-
-
-
-
 
 def main(argv):
     try:
