@@ -29,6 +29,24 @@ class Test(object):
         sp_ranking_list : list of Power instances, ranked by speech, music separation threshold separation power
         setting : dict, dict of system setting
         config : dict, dict of target configeration
+
+        es_features :
+        es_thresholds_left :
+        es_thresholds_right :
+        em_features :
+        em_thresholds_left :
+        em_thresholds_right :
+        hs_features :
+        hs_thresholds :
+        hs_positions :
+        hm_features :
+        hm_thresholds :
+        hm_positions :
+        sp_features :
+        sp_thresholds :
+        sp_music_positions :
+        sp_speech_positions :
+
         logger : logging.Logger
 
         _operating_rate :
@@ -40,6 +58,9 @@ class Test(object):
         _mfcc_order :
         _roll_percent :
         _statistics_column_values :
+        T_init :
+        T_min :
+
     """
     def __init__(self, system, cfg):
 
@@ -82,6 +103,10 @@ class Test(object):
         self._mfcc_order = self.setting['mfcc_order']
         self._roll_percent = self.setting['roll_percent']
 
+        # adaptive threshold setting according to the number of features used in separation threshold
+        self.T_init = 1.0*4 / self.setting['n_sp_features'] - 0.01
+
+        self.T_min = 1.0*2 / self.setting['n_sp_features'] - 0.01
 
         # statistics columns names
         self._statistics_column_values = ['ste_mean', 'ste_std', 'ste_mean_diff', 'ste_std_diff',
@@ -102,6 +127,36 @@ class Test(object):
                                                'flux_mean', 'flux_std', 'flux_mean_diff', 'flux_std_diff',
                                                'spread_mean', 'spread_std', 'spread_mean_diff', 'spread_std_diff',
                                                'lster'])
+
+        # the best n features for extreme speech threshold and its corresponding extrem speech threshold
+        self.es_features = [power.name_ for power in self.es_ranking_list[0:self.setting['n_es_features']]]
+        self.es_thresholds_left = np.array([power.extreme_speech_left_ for power in self.es_ranking_list[0:self.setting['n_es_features']]])
+        self.es_thresholds_right = np.array([power.extreme_speech_right_ for power in self.es_ranking_list[0:self.setting['n_es_features']]])
+
+        # the best n features for extreme music threshold and its corresponding extrem music threshold
+        self.em_features = [power.name_ for power in self.em_ranking_list[0:self.setting['n_em_features']]]
+        self.em_thresholds_left = np.array([power.extreme_music_left_ for power in self.em_ranking_list[0:self.setting['n_em_features']]])
+        self.em_thresholds_right = np.array([power.extreme_music_right_ for power in self.em_ranking_list[0:self.setting['n_em_features']]])
+
+        # the best n features for high probibality speech threshold and its corresponding high propability speech threshold,
+        # speech/music statistics position, -1 indicate 'left', 1 indicate right
+        self.hs_features = [power.name_ for power in self.hs_ranking_list[0:self.setting['n_hs_features']]]
+        self.hs_thresholds = np.array([power.high_speech_ for power in self.hs_ranking_list[0:self.setting['n_hs_features']]])
+        self.hs_positions = np.array([-1 if power._speech_position == 'left' else 1 for power in self.hs_ranking_list[0:self.setting['n_hs_features']]])
+
+        # the best n features for high probibality music threshold and its corresponding high propability music threshold
+        # speech/music position, -1 indicate 'left', 1 indicate right
+        self.hm_features = [power.name_ for power in self.hm_ranking_list[0:self.setting['n_hm_features']]]
+        self.hm_thresholds = np.array([power.hm_threshold_ for power in self.hm_ranking_list[0:self.setting['n_hm_features']]])
+        self.hm_positions = np.array([-1 if power._music_position == 'left' else 1 for power in self.hm_ranking_list[0:selt.setting['n_hm_features']]])
+
+        # the best n features for separation threshold and its corresponding separation threshold
+        # speech/music position, -1 indicate 'left', 1 indicate right
+        self.sp_features = [power.name_ for power in self.sp_ranking_list[0:self.setting['n_sp_features']]]
+        self.sp_thresholds = np.array([power.separation_ for power in self.sp_ranking_list[0:self.setting['n_sp_features']]])
+        self.sp_music_positions = np.array([-1 if power._music_position == 'left' else 1 for power in self.sp_ranking_list[0:self.setting['n_sp_features']]])
+        self.sp_speech_positions = -1 * self.sp_music_positions
+
 
         # target config
         try:
@@ -140,6 +195,11 @@ class Test(object):
             else:
                 self.config['labels_directory'] = self.config['source_data_path']
 
+        # check smoothing parameters
+        if self.config.get('average_period', None) == None:
+            self.config['average_period'] = 5
+        if self.config.get('time_constant', None) == None:
+            self.config['time_constant'] = self.config['average_period']
 
     def _short_time_energy(self):
         """
@@ -632,67 +692,118 @@ class Test(object):
         parameters:
             feature_statistics_df : pandas.DataFrame, shape=(n_segments, m_features)
         
-        return : list of string, shape=(n_segments,), 'music' or 'speech'
+        return:
+            Db : np.ndarray, shape=(n_segments,), -1 or 1, -1 -> music, 1 -> speech
         """
-
-        # the best n features for extreme speech threshold and its corresponding extrem speech threshold
-        es_features = [power.name_ for power in self.es_ranking_list[0:self.setting['n_es_features']]]
-        es_thresholds_left = np.array([power.extreme_speech_left_ for power in self.es_ranking_list[0:self.setting['n_es_features']]])
-        es_thresholds_right = np.array([power.extreme_speech_right_ for power in self.es_ranking_list[0:self.setting['n_es_features']]])
-
-        # the best n features for extreme music threshold and its corresponding extrem music threshold
-        em_features = [power.name_ for power in self.em_ranking_list[0:self.setting['n_em_features']]]
-        em_thresholds_left = np.array([power.extreme_music_left_ for power in self.em_ranking_list[0:self.setting['n_em_features']]])
-        em_thresholds_right = np.array([power.extreme_music_right_ for power in self.em_ranking_list[0:self.setting['n_em_features']]])
-
-        # the best n features for high probibality speech threshold and its corresponding high propability speech threshold
-        hs_features = [power.name_ for power in self.hs_ranking_list[0:self.setting['n_hs_features']]]
-        hs_thresholds = np.array([power.high_speech_ for power in self.hs_ranking_list[0:self.setting['n_hs_features']]])
-
-        # the best n features for high probibality music threshold and its corresponding high propability music threshold
-        hm_features = [power.name_ for power in self.hm_ranking_list[0:self.setting['n_hm_features']]]
-        hm_thresholds = np.array(power.hm_threshold_ for power in self.hm_ranking_list[0:self.setting['n_hm_features']])
-
-        # the best n features for separation threshold and its corresponding separation threshold
-        sp_features = [power.name_ for power in self.sp_ranking_list[0:self.setting['n_sp_features']]]
-        sp_thresholds = np.array(power.separation_ for power in self.sp_ranking_list[0:self.setting['n_sp_features']])
-
-        # the indices at which the segments haven't been segmented
-        unsegmented_indices = list(range(feature_statistics_df.count()[0]))
-
-        # initial classification label
-        label = [0.0] * feature_statistics_df.count()[0]
-
-        # initialize the alpha, mentioned at page 9 of the paper
-        alpha = 0.5
-
         # number of features above its corresponding extrem speech threshold
-        S_ex_left = np.where((feature_statistics_df[es_features].values - es_thresholds_left) < 0, 1, 0)
-        S_ex_right = np.where((feature_statistics_df[es_features].values - es_thresholds_right) > 0, 1, 0)
-        S_ex = np.sum(S_ex_left + S_ex_right, axis=-1)
+        S_ex_left = np.where((feature_statistics_df[self.es_features].values - self.es_thresholds_left) < 0, 1, 0)
+        S_ex_right = np.where((feature_statistics_df[self.es_features].values - self.es_thresholds_right) > 0, 1, 0)
+        S_x = np.sum(S_ex_left + S_ex_right, axis=-1)
+
+        # number of features above its corresponding high probability speech threshold
+        S_h = np.sum(np.where(((feature_statistics_df[self.hs_features].values - self.hs_thresholds) * self.hs_positions) > 0, 1, 0) , axis=-1)
+
+        # number of features in the separation set that are classified as speech
+        S_p = np.sum(np.where(((feature_statistics_df[self.sp_features].values - self.sp_thresholds) * self.sp_speech_positions) > 0, 1, 0) , axis=-1)
 
         # number of features above its corresponding extrem music threshold
-        M_ex_left = np.where((feature_statistics_df[em_features].values - em_thresholds_left) < 0, 1, 0)
-        M_ex_right = np.where((feature_statistics_df[em_features].values - em_thresholds_right) > 0, 1, 0)
-        M_ex = np.sum(M_ex_left, M_ex_right, axis=-1)
+        M_ex_left = np.where((feature_statistics_df[self.em_features].values - self.em_thresholds_left) < 0, 1, 0)
+        M_ex_right = np.where((feature_statistics_df[self.em_features].values - self.em_thresholds_right) > 0, 1, 0)
+        M_x = np.sum(M_ex_left + M_ex_right, axis=-1)
 
-        # excute (ii) for speech first, find the indices where the segments satisfy Sx > 1 and Mx = 0
-        condition_Sx = np.where(S_ex > 1, 1, 0) # if the segment satify Sx > 1, set 1, otherwise 0
-        condition_Mx = np.where(M_ex == 0, 1, 0)
-        indices = np.where((condition_Sx * condition_Mx) == 1)[0]
+        # number of features above its corresponding high probability music threshold
+        M_h = np.sum(np.where(((feature_statistics_df[self.hm_features].values - self.hm_thresholds) * self.hm_positions) > 0, 1, 0) , axis=-1)
 
-        # set the segments whose indice is in indices to 1, indicate it belongs to speech
-        if len(indices) != 0:
-            label[[indices]] = 1.0
-            for i in indices:
-                unsegmented_indices.remove(i)
+         # number of features in the separation set that are classified as music
+        M_p = np.sum(np.where(((feature_statistics_df[self.sp_features].values - self.sp_thresholds) * self.sp_music_positions) > 0, 1, 0) , axis=-1)
 
-        # excute
+        # number of segments
+        n_segments = feature_statistics_df.count()[0]
+
+        # initial classification label
+        Di = np.zeros(n_segments)
+
+        # initial classification for each segment
+        for i in range(n_segments):
+            Di[i] = self._initial_classification(S_x[i], S_h[i], S_p[i], M_x[i], M_h[i], M_p[i])
+
+        # classification smoothing 
+        Ds = np.zeros(n_segments)
+
+        forgetting_factors = np.array([np.e**(-1.0*(self.config['average_period']-k-1)/self.config['time_constant']) for k in range(self.config['average_period'])])
+        
+        normalizing_constant = forgetting_factors.sum()
+        
+        for i in range(self.config['average_period']):
+            Ds[i] = (forgetting_factors[-1-i:] * Di[:i+1]).sum() / forgetting_factors[-1-i:].sum()
+        
+        for i in range(self.config['average_period'], n_segments):
+            Ds[i] = (forgetting_factors * Di[i-4:i+1]).sum() / normalizing_constant
+
+        # adaptative threshold and binarization
+        Db = np.zeros(n_segments)
+
+        T = self.T_init
+
+        Db[0] = 1 if Ds[0] > 0 else -1
+        
+        for i in range(1, n_segments):
+            if Ds[i] >= T:
+                Db[i] = 1
+            elif Ds[i] =< (-T):
+                Db[i] = -1
+            else:
+                if Ds[i] < Ds[i-1]:
+                    Db[i] = -1
+                else:
+                    Db[i] = 1
+            if Db[i] == Db[i-1]:
+                T = max(0.9*T, self.T_min)
+            else:
+                T = self.T_init
+
+        return Db
 
 
 
 
-    def _segmentation_help(self, )
+
+
+
+    def _initial_classification(self, Sx, Sh, Sp, Mx, Mh, Mp):
+        """
+        excute initial classification given Sx, Sh, Sp, Mx, Mh, Mp, alpha.
+
+        note: the logic of this function is based on Figure 4 in the Decision paper
+
+        parameters:
+            Sx : int, number of features above its corresponding extrem speech threshold
+            Sh : int, number of features above its corresponding high probability speech threshold
+            Sp : int, number of features in the separation set that are classified as speech
+            Mx : int, number of features above its corresponding extrem music threshold
+            Mh : int, number of features above its corresponding high probability music threshold
+            Mp : int, number of features in the separation set that are classified as music
+        return 
+            resault : float number during (-1, 1), -1: music, 1: speech
+        """
+
+        # initialize the alpha, mentioned at page 9 of the paper
+        alpha = 0.66666
+
+        if (Sx > 0 and Mx == 0 and Mh == 0) or (Sx > 1 and Mx == 0) or (Sh > alpha*self.setting['n_hs_features'] and Mh == 0):
+            return 1.0
+        elif (Mx > 0 and Sx == 0 and Sx == 0) or (Mx > 1 and Sx == 0) or (Mh > alpha*self.setting['n_hm_features'] and Sh == 0):
+            return -1.0
+        else:
+            resault = 1.0 * (Sp - Mp) / self.setting['n_sp_features']
+            return resault
+
+
+
+
+    def _segmentation_help(self):
+        pass
+
 
 
 

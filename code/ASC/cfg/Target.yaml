@@ -1,7 +1,13 @@
 log_file_path:
 
-source_data_path:
+wav_path:
+
+feature_path:
 
 with_statistics:
 
 labels_directory:
+
+average_period: 5
+
+time_constant: 5
