@@ -14,6 +14,7 @@ import logging
 import gc
 import copy
 import pickle
+import time
 
 from tools.readlabel import readlabel
 from Config import Config
@@ -64,12 +65,15 @@ class Power(object):
         hm_inclusion_ :
         hm_error_ :
 
+        number_bins : int, 
+
     attributes(methods):
         
 
     """
     def __init__(self, name, speech, music, logger, free=True):
         super(Power, self).__init__()
+        self.number_bins = 1000
 
         self._free = free
         self._logger = logger
@@ -181,8 +185,8 @@ class Power(object):
             self.extreme_music_left_ = speech_min
 
         # *******************compute the high probabilyty thresholds**************
-        # compute the probility of number between min(speech_min, music_min) and max(speech_max, music_max), step length is (max(speech_max, music_max) - min(speech_min, music_min)) / 1000
-        numbers = np.arange(min(speech_min, music_min), max(speech_max, music_max), (max(speech_max, music_max) - min(speech_min, music_min)) / 1000)
+        # compute the probility of number between min(speech_min, music_min) and max(speech_max, music_max), step length is (max(speech_max, music_max) - min(speech_min, music_min)) / self.number_bins
+        numbers = np.arange(min(speech_min, music_min), max(speech_max, music_max), (max(speech_max, music_max) - min(speech_min, music_min)) / self.number_bins)
         speech_prob = self._speech_kde(numbers)
         music_prob = self._music_kde(numbers)
 
@@ -320,8 +324,8 @@ class Power(object):
         music_max = music.max()
         music_min = music.min()
 
-        # compute the probility of number between min(speech_min, music_min) and max(speech_max, music_max), step length is (max(speech_max, music_max) - min(speech_min, music_min)) / 1000
-        numbers = np.arange(min(speech_min, music_min), max(speech_max, music_max), (max(speech_max, music_max) - min(speech_min, music_min)) / 1000)
+        # compute the probility of number between min(speech_min, music_min) and max(speech_max, music_max), step length is (max(speech_max, music_max) - min(speech_min, music_min)) / self.number_bins
+        numbers = np.arange(min(speech_min, music_min), max(speech_max, music_max), (max(speech_max, music_max) - min(speech_min, music_min)) / self.number_bins)
         
         # fit music/speech data using gaussian kernel function
         speech_kde = stats.gaussian_kde(speech)
@@ -358,7 +362,7 @@ class Power(object):
         music_kde = stats.gaussian_kde(music)
 
         # bins over which to search separation threshold
-        numbers = np.arange(min(speech_min, music_min), max(speech_max, music_max), (max(speech_max, music_max) - min(speech_min, music_min)) / 1000)
+        numbers = np.arange(min(speech_min, music_min), max(speech_max, music_max), (max(speech_max, music_max) - min(speech_min, music_min)) / self.number_bins)
 
         if speech_max < music_min:
             self.separation_ = (speech_max + music_min) / 2
@@ -1553,8 +1557,33 @@ class Train(builtins.object):
 
         return es_powerlist_ranking, em_powerlist_ranking, hs_powerlist_ranking, hm_powerlist_ranking, sp_powerlist_ranking
 
+    def _write_cross_validation(self):
+        """
+        write the resault of cross validation
+        """
+        cv_scores_sorted = self._cross_validation()
+
+        self._logger.info("writing cross validation resaults list to model files directory!")
+
+        with open(os.path.join(self._model_files_dir, 'cv_scores_sorted'), 'wb') as f:
+            pickle.dump(cv_scores_sorted, f)
+        
+        return
+
     def _cross_validation(self):
         """
+        cross validation to choose features for each threshold
+
+        return:
+            cv_score_sorted : list of tuples, [('3_2_3_2_12', 0.93), ('3_2_3_3_12', 0.91), ...], cv scores.
+                              in ('3_2_3_2_12', 0.93), 
+                              first number in '3_2_3_2_12', which is 3, is the number of features used in extreme speech threshold
+                              second number in '3_2_3_2_12', which is 2, is the number of features used in extreme music threshold
+                              third number in '3_2_3_2_12', which is 3, is the number of features used in high speech threshold
+                              fourth number in '3_2_3_2_12', which is 2, is the number of features used in high music threshold
+                              last number in '3_2_3_2_12', which is 12, is the number of features used in separation threshold
+                              and 0.93 is the average score
+
         """
         self._logger.info("Start cross validation to choose features!")
         K_fold = 5
@@ -1576,25 +1605,25 @@ class Train(builtins.object):
 
         self._logger.info("loading all kinds of ranking list!")
         # load all kinds of ranking list
-        with open(os.path.join(self._model_files_dir, 'es_powerlist_ranking'), 'r') as f:
+        with open(os.path.join(self._model_files_dir, 'es_powerlist_ranking'), 'rb') as f:
             es_powerlist_ranking = pickle.load(f)
             es_features = [power.name_ for power in es_powerlist_ranking[0:max_feature]]
 
-        with open(os.path.join(self._model_files_dir, 'em_powerlist_ranking'), 'r') as f:
+        with open(os.path.join(self._model_files_dir, 'em_powerlist_ranking'), 'rb') as f:
             em_powerlist_ranking = pickle.load(f)
             em_features = [power.name_ for power in em_powerlist_ranking[0:max_feature]]
 
-        with open(os.path.join(self._model_files_dir, 'hs_powerlist_ranking'), 'r') as f:
+        with open(os.path.join(self._model_files_dir, 'hs_powerlist_ranking'), 'rb') as f:
             hs_powerlist_ranking = pickle.load(f)
             hs_features = [power.name_ for power in hs_powerlist_ranking[0:max_feature]]
             hs_positions = np.array([-1 if power._speech_position == 'left' else 1 for power in hs_powerlist_ranking[0:max_feature]])
 
-        with open(os.path.join(self._model_files_dir, 'hm_powerlist_ranking'), 'r') as f:
+        with open(os.path.join(self._model_files_dir, 'hm_powerlist_ranking'), 'rb') as f:
             hm_powerlist_ranking = pickle.load(f)
             hm_features = [power.name_ for power in hm_powerlist_ranking[0:max_feature]]
             hm_positions = np.array([-1 if power._music_position == 'left' else 1 for power in hm_powerlist_ranking[0:max_feature]])
 
-        with open(os.path.join(self._model_files_dir, 'sp_powerlist_ranking'), 'r') as f:
+        with open(os.path.join(self._model_files_dir, 'sp_powerlist_ranking'), 'rb') as f:
             sp_powerlist_ranking = pickle.load(f)
             sp_features = [power.name_ for power in sp_powerlist_ranking[0:max_feature]]
             sp_music_positions = np.array([-1 if power._music_position == 'left' else 1 for power in sp_powerlist_ranking[0:max_feature]])
@@ -1631,6 +1660,7 @@ class Train(builtins.object):
             sp_powerlist_ranking_cv = copy.deepcopy(sp_powerlist_ranking[0:max_feature])
             
             # update extreme speech threshold using speech/music training data
+            self._logger.info("{}'th cross validation, Update extreme speech threshold using speech/music training data".format(i+1))
             for power in es_powerlist_ranking_cv:
                 power.update_extreme_threshold(speech_train[power.name_].values, music_train[power.name_].values)
             
@@ -1639,6 +1669,7 @@ class Train(builtins.object):
             es_thresholds_right = np.array([power.extreme_speech_right_ for power in es_powerlist_ranking_cv])
             
             # update extreme music threshold using speech/music training data
+            self._logger.info("{}'th cross validation, Update extreme music threshold using speech/music training data".format(i+1))
             for power in em_powerlist_ranking_cv:
                 power.update_extreme_threshold(speech_train[power.name_].values, music_train[power.name_].values)
             
@@ -1647,6 +1678,7 @@ class Train(builtins.object):
             em_thresholds_right = np.array([power.extreme_music_right_ for power in em_powerlist_ranking_cv])
             
             # update high probability speech threshold using speech/music training data
+            self._logger.info("{}'th cross validation, Update high probability speech threshold using speech/music training data".format(i+1))
             for power in hs_powerlist_ranking_cv:
                 power.update_high_probability_threshold(speech_train[power.name_].values, music_train[power.name_].values)
             
@@ -1654,6 +1686,7 @@ class Train(builtins.object):
             hs_thresholds = np.array([power.high_speech_ for power in hs_powerlist_ranking_cv])
 
             # update high probability music threshold using speech/music training data
+            self._logger.info("{}'th cross validation, Update high probability music threshold using speech/music training data".format(i+1))
             for power in hm_powerlist_ranking_cv:
                 power.update_high_probability_threshold(speech_train[power.name_].values, music_train[power.name_].values)
             
@@ -1661,6 +1694,7 @@ class Train(builtins.object):
             hm_thresholds = np.array([power.high_music_ for power in hm_powerlist_ranking_cv])
 
             # update separation thresholds using speech/music training data
+            self._logger.info("{}'th cross validation, Update separation thresholds using speech/music training data".format(i+1))
             for power in sp_powerlist_ranking_cv:
                 power.update_separation_threshold(speech_train[power.name_].values, music_train[power.name_].values)
             
@@ -1716,32 +1750,50 @@ class Train(builtins.object):
 
                 # initial classification for each segment
                 for j in range(n_segments):
-                    if (S_x > 0 and M_x == 0 and M_h == 0) or (S_x > 1 and Mx == 0) or (S_h > alpha*c and M_h == 0):
+                    if (S_x[j] > 0 and M_x[j] == 0 and M_h[j] == 0) or (S_x[j] > 1 and Mx[j] == 0) or (S_h[j] > alpha*c and M_h[j] == 0):
                         Di[j] = 1.0
-                    elif (M_x > 0 and S_x == 0 and S_x == 0) or (M_x > 1 and S_x == 0) or (M_h > alpha*d and S_h == 0):
+                    elif (M_x[j] > 0 and S_x[j] == 0 and S_x[j] == 0) or (M_x[j] > 1 and S_x[j] == 0) or (M_h[j] > alpha*d and S_h[j] == 0):
                         Di[j] -1.0
                     else:
-                        Di[j] = 1.0 * (S_p - M_p) / e
+                        Di[j] = 1.0 * (S_p[j] - M_p[j]) / e
 
                 return Di
 
+            max_score = -np.inf
             # cross-validation to get scores
-            for a in range(1, max_feature+1, 2): # a is number of features used in extreme speech threshold
-                for b in range(1, max_feature+1, 2): # b is number of features used in extreme music threshold
-                    for c in range(1, max_feature+1, 2): # c is number of features used in high probability speech threshold
-                        for d in range(1, max_feature+1, 2): # d is number of features used in high probability music threshold
-                            for e in range(1, max_feature+1, 2): # e is number of features used in separation threshold
+            for a in range(1, max_feature+1): # a is number of features used in extreme speech threshold
+                for b in range(1, max_feature+1): # b is number of features used in extreme music threshold
+                    for c in range(1, max_feature+1): # c is number of features used in high probability speech threshold
+                        start = time.time()
+                        for d in range(1, max_feature+1): # d is number of features used in high probability music threshold
+                            for e in range(1, max_feature+1): # e is number of features used in separation threshold
                                 speech_test_resault = segmentation(speech_test,a,b,c,d,e)
                                 music_test_resault = segmentation(music_test,a,b,c,d,e)
-                                test_score = np.where([speech_test_resault>0,music_test_resault<0], 1, 0).mean()
+                                test_score = (np.where(speech_test_resault>0, 1, 0).sum() + np.where(music_test_resault<0, 1, 0).sum()) / (speech_test_resault.size + music_test_resault.size)
                                 if cv_score.get('{}_{}_{}_{}_{}'.format(a,b,c,d,e), None) == None:
                                     cv_score['{}_{}_{}_{}_{}'.format(a,b,c,d,e)] = test_score
                                 else:
                                     cv_score['{}_{}_{}_{}_{}'.format(a,b,c,d,e)] += test_score
+                                if test_score > max_score:
+                                    max_score = test_score
+                                    self._logger.info("{}'th cross-validation fold!\n extreme speech features number: {}\n extreme music features number: {}\n, high speech features number: {}\n, high music features number: {}\n, separation features number: {}\n, *********************BEST ACCURACY FOR NOW: {}".format(i+1,a,b,c,d,e,max_score))
+                        cost = time.time() - start
+            '''*****************************************************************************************************************'''
+            '''*****************************************************************************************************************'''
+                        self._logger.info("{}'th cross-validation fold!\n extreme speech features number: {}\n extreme music features number: {}\n, high speech features number: {}\n, high music features number: {}\n, separation features number: {}\n".format(i+1,a,b,c,d,e))
 
-                                self._logger.info("{}'th cross-validation fold!\n extreme speech features number: {}\n extreme music features number: {}\n, high speech features number: {}\n, high music features number: {}, separation features number: {}\n, accuracy: {}".format(i+1,a,b,c,d,e,test_score))
 
-            
+        # get the average score and transform dict to list
+        for key, value in cv_score.items():
+            cv_score[key] = value / K_fold
+
+        cv_score = list(cv_score.items())
+
+        # sort cv_score by scores
+        cv_score_sorted = sorted(cv_score, key = lambda x: x[1], reverse=True)
+
+        return cv_score_sorted
+
 
 
 
