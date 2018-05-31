@@ -18,6 +18,7 @@ import pickle
 from tools.readlabel import readlabel
 from Config import Config
 from sklearn.mixture import GaussianMixture
+from sklearn.model_selection import ShuffleSplit
 from scipy import stats
 
 class Power(object):
@@ -282,6 +283,108 @@ class Power(object):
 
         return joint_decision_error
 
+    def update_extreme_threshold(self, speech, music):
+        """
+        update extreme speech/music threshold using new data.
+
+        parameters:
+            speech : np.ndarray, shape=(n_samples,) new speech data
+            music : np.ndarray, shape=(m_samples,), new music data
+        """
+        speech_max = speech.max()
+        speech_min = speech.min()
+        music_max = music.max()
+        music_min = music.min()
+
+        
+        if speech_max > music_max:
+            self.extreme_speech_right_ = music_max
+        else:
+            self.extreme_music_right_ = speech_max
+
+        if speech_min < music_min:
+            self.extreme_speech_left_ = music_min
+        else:
+            self.extreme_music_left_ = speech_min
+
+    def update_high_probability_threshold(self, speech, music):
+        """
+        update high probability speech/music threshold using new data.
+
+        parameters:
+            speech : np.ndarray, shape=(n_samples,) new speech data
+            music : np.ndarray, shape=(m_samples,), new music data
+        """
+        speech_max = speech.max()
+        speech_min = speech.min()
+        music_max = music.max()
+        music_min = music.min()
+
+        # compute the probility of number between min(speech_min, music_min) and max(speech_max, music_max), step length is (max(speech_max, music_max) - min(speech_min, music_min)) / 1000
+        numbers = np.arange(min(speech_min, music_min), max(speech_max, music_max), (max(speech_max, music_max) - min(speech_min, music_min)) / 1000)
+        
+        # fit music/speech data using gaussian kernel function
+        speech_kde = stats.gaussian_kde(speech)
+        music_kde = stats.gaussian_kde(music)
+
+        speech_prob = speech_kde(numbers)
+        music_prob = music_kde(numbers)
+
+        # compute the prob difference between speech and music by subtracting music_prob from speech_prob
+        prob_diff = speech_prob - music_prob
+
+        # the max value of prob_diff is high probility speech threshold point where where the difference between the
+        # height of the speech PDF and the height of the music PDF is maximal; the min value of prob_diff is high
+        # probility music threshold point where where the difference between the height of the music PDF and the
+        # height of the speech PDF is maximal
+        self.high_speech_ = numbers[prob_diff.argmax()]
+        self.high_music_ = numbers[prob_diff.argmin()]
+
+    def update_separation_threshold(self, speech, music):
+        """
+        update high speech/music separation threshold using new data.
+
+        parameters:
+            speech : np.ndarray, shape=(n_samples,) new speech data
+            music : np.ndarray, shape=(m_samples,), new music data
+        """
+        speech_max = speech.max()
+        speech_min = speech.min()
+        music_max = music.max()
+        music_min = music.min()
+
+        # fit music/speech data using gaussian kernel function
+        speech_kde = stats.gaussian_kde(speech)
+        music_kde = stats.gaussian_kde(music)
+
+        # bins over which to search separation threshold
+        numbers = np.arange(min(speech_min, music_min), max(speech_max, music_max), (max(speech_max, music_max) - min(speech_min, music_min)) / 1000)
+
+        if speech_max < music_min:
+            self.separation_ = (speech_max + music_min) / 2
+        elif music_max < speech_min:
+            self.separation_ = (music_max + speech_min) / 2
+        else:
+
+            def joint_decision_error(a, speech_position):
+                if speech_position == 'left':
+                    speech_decision_error = speech_kde.integrate_box_1d(a, np.inf)
+                    music_decision_error = music_kde.integrate_box_1d(-np.inf, a)
+                else:
+                    speech_decision_error = speech_kde.integrate_box_1d(-np.inf, a)
+                    music_decision_error = music_kde.integrate_box_1d(a, np.inf)
+
+                joint_decision_error_ = 0.5 * (speech_decision_error + music_decision_error)
+
+                return joint_decision_error_
+
+            # find the point where the joint decision error is the smallest
+            joint_decision_errors = np.zeros(len(numbers))
+            for i in range(len(numbers)):
+                joint_decision_errors[i] = joint_decision_error(numbers[i], self._speech_position)
+            self.separation_ = numbers[joint_decision_errors.argmin()]
+
+
 
 
 
@@ -370,10 +473,12 @@ class Train(builtins.object):
                                                'lster'])
 
 
-        if self._with_statistics in ['True', 'true']:
-            self._write_feature_ranking()
-        else:
+        if not self._with_statistics in ['True', 'true']:
             self._write_all_statistics()
+        
+        self._write_feature_ranking()
+        self._cross_validation()
+
 
 
     def init(self, cfg):
@@ -1451,7 +1556,199 @@ class Train(builtins.object):
     def _cross_validation(self):
         """
         """
-        pass
+        self._logger.info("Start cross validation to choose features!")
+        K_fold = 5
+        # maximum features for each threshold
+        max_feature = 15
+        # dict of cv score
+        cv_score = {}
+
+        self._logger.info("loading the speech and music statistics dataframe!")
+        # extract all feature statistics for speech files
+        speech_statistics_path = os.path.join(self._statistics_files_dir, self._speech_statistics_name+'.csv')
+
+        # extract all feature statistics for music files
+        music_statistics_path = os.path.join(self._statistics_files_dir, self._music_statistics_name+'.csv')
+
+        # load speech and music statistics data
+        speech = pd.read_csv(speech_statistics_path)
+        music = pd.read_csv(music_statistics_path)
+
+        self._logger.info("loading all kinds of ranking list!")
+        # load all kinds of ranking list
+        with open(os.path.join(self._model_files_dir, 'es_powerlist_ranking'), 'r') as f:
+            es_powerlist_ranking = pickle.load(f)
+            es_features = [power.name_ for power in es_powerlist_ranking[0:max_feature]]
+
+        with open(os.path.join(self._model_files_dir, 'em_powerlist_ranking'), 'r') as f:
+            em_powerlist_ranking = pickle.load(f)
+            em_features = [power.name_ for power in em_powerlist_ranking[0:max_feature]]
+
+        with open(os.path.join(self._model_files_dir, 'hs_powerlist_ranking'), 'r') as f:
+            hs_powerlist_ranking = pickle.load(f)
+            hs_features = [power.name_ for power in hs_powerlist_ranking[0:max_feature]]
+            hs_positions = np.array([-1 if power._speech_position == 'left' else 1 for power in hs_powerlist_ranking[0:max_feature]])
+
+        with open(os.path.join(self._model_files_dir, 'hm_powerlist_ranking'), 'r') as f:
+            hm_powerlist_ranking = pickle.load(f)
+            hm_features = [power.name_ for power in hm_powerlist_ranking[0:max_feature]]
+            hm_positions = np.array([-1 if power._music_position == 'left' else 1 for power in hm_powerlist_ranking[0:max_feature]])
+
+        with open(os.path.join(self._model_files_dir, 'sp_powerlist_ranking'), 'r') as f:
+            sp_powerlist_ranking = pickle.load(f)
+            sp_features = [power.name_ for power in sp_powerlist_ranking[0:max_feature]]
+            sp_music_positions = np.array([-1 if power._music_position == 'left' else 1 for power in sp_powerlist_ranking[0:max_feature]])
+            sp_speech_positions = -1 * sp_music_positions
+
+        # start cross-validation
+        rs = ShuffleSplit(n_splits=K_fold, test_size=0.2, train_size=0.8, random_state=2018)
+        # list of speech/music train/test index list
+        speech_train_ix_list = []
+        speech_test_ix_list = []
+        music_train_ix_list = []
+        music_test_ix_list = []
+
+        # genarate list of speech/music train/test index list
+        for speech_train_ix, speech_test_ix in rs.split(speech.values):
+            speech_train_ix_list.append(speech_train_ix)
+            speech_test_ix_list.append(speech_test_ix)
+        for music_train_ix, music_test_ix in rs.split(music.values):
+            music_train_ix_list.append(music_train_ix)
+            music_test_ix_list.append(music_test_ix)
+
+        for i in range(K_fold):
+            # fetch speech/music train/test dataframe using index operation
+            speech_train = speech.iloc[speech_train_ix_list[i]]
+            speech_test = speech.iloc[speech_test_ix_list[i]]
+            music_train = music.iloc[music_train_ix_list[i]]
+            music_test = music.iloc[music_test_ix_list[i]]
+
+            # copy the ranking list for each threshold and update corresponding threshold using cv train data
+            es_powerlist_ranking_cv = copy.deepcopy(es_powerlist_ranking[0:max_feature])
+            em_powerlist_ranking_cv = copy.deepcopy(em_powerlist_ranking[0:max_feature])
+            hs_powerlist_ranking_cv = copy.deepcopy(hs_powerlist_ranking[0:max_feature])
+            hm_powerlist_ranking_cv = copy.deepcopy(hm_powerlist_ranking[0:max_feature])
+            sp_powerlist_ranking_cv = copy.deepcopy(sp_powerlist_ranking[0:max_feature])
+            
+            # update extreme speech threshold using speech/music training data
+            for power in es_powerlist_ranking_cv:
+                power.update_extreme_threshold(speech_train[power.name_].values, music_train[power.name_].values)
+            
+            # fetch the new extrame speech thresholds
+            es_thresholds_left = np.array([power.extreme_speech_left_ for power in es_powerlist_ranking_cv])
+            es_thresholds_right = np.array([power.extreme_speech_right_ for power in es_powerlist_ranking_cv])
+            
+            # update extreme music threshold using speech/music training data
+            for power in em_powerlist_ranking_cv:
+                power.update_extreme_threshold(speech_train[power.name_].values, music_train[power.name_].values)
+            
+            # fetch the new extrame music thresholds
+            em_thresholds_left = np.array([power.extreme_music_left_ for power in em_powerlist_ranking_cv])
+            em_thresholds_right = np.array([power.extreme_music_right_ for power in em_powerlist_ranking_cv])
+            
+            # update high probability speech threshold using speech/music training data
+            for power in hs_powerlist_ranking_cv:
+                power.update_high_probability_threshold(speech_train[power.name_].values, music_train[power.name_].values)
+            
+            # fetch the new high probability speech thresholds
+            hs_thresholds = np.array([power.high_speech_ for power in hs_powerlist_ranking_cv])
+
+            # update high probability music threshold using speech/music training data
+            for power in hm_powerlist_ranking_cv:
+                power.update_high_probability_threshold(speech_train[power.name_].values, music_train[power.name_].values)
+            
+            # fetch the new high probability speech thresholds
+            hm_thresholds = np.array([power.high_music_ for power in hm_powerlist_ranking_cv])
+
+            # update separation thresholds using speech/music training data
+            for power in sp_powerlist_ranking_cv:
+                power.update_separation_threshold(speech_train[power.name_].values, music_train[power.name_].values)
+            
+            # fetch new separation thresholds
+            sp_thresholds = np.array([power.separation_ for power in sp_powerlist_ranking_cv])
+
+
+            def segmentation(feature_statistics_df, a, b, c, d, e):
+                """
+                perform segmentation of a given audio signal's feature statistics dataframe into “speech” and “music”.
+
+                parameters:
+                    feature_statistics_df : pandas.DataFrame, shape=(n_segments, m_features)
+                    a : int, number of features used in extreme speech threshold
+                    b : int, number of features used in extreme music threshold
+                    c : int, number of features used in high probability speech threshold
+                    d : int, number of features used in high probability music threshold
+                    e : int, number of features used in separation threshold
+                
+                return:
+                    Di : np.ndarray, shape=(n_segments,), -1 or 1 or in (-1,1), -1 -> music, 1 -> speech
+                """
+                # initialize the alpha, mentioned at page 9 of the paper
+                alpha = 0.66666
+
+                # number of features above its corresponding extrem speech threshold
+                S_ex_left = np.where((feature_statistics_df[es_features[0:a]].values - es_thresholds_left[0:a]) < 0, 1, 0)
+                S_ex_right = np.where((feature_statistics_df[es_features[0:a]].values - es_thresholds_right[0:a]) > 0, 1, 0)
+                S_x = np.sum(S_ex_left + S_ex_right, axis=-1)
+
+                # number of features above its corresponding high probability speech threshold
+                S_h = np.sum(np.where(((feature_statistics_df[hs_features[0:c]].values - hs_thresholds[0:c]) * hs_positions[0:c]) > 0, 1, 0) , axis=-1)
+
+                # number of features in the separation set that are classified as speech
+                S_p = np.sum(np.where(((feature_statistics_df[sp_features[0:e]].values - sp_thresholds[0:e]) * sp_speech_positions[0:e]) > 0, 1, 0) , axis=-1)
+
+                # number of features above its corresponding extrem music threshold
+                M_ex_left = np.where((feature_statistics_df[em_features[0:b]].values - em_thresholds_left[0:b]) < 0, 1, 0)
+                M_ex_right = np.where((feature_statistics_df[em_features[0:b]].values - em_thresholds_right[0:b]) > 0, 1, 0)
+                M_x = np.sum(M_ex_left + M_ex_right, axis=-1)
+
+                # number of features above its corresponding high probability music threshold
+                M_h = np.sum(np.where(((feature_statistics_df[hm_features[0:d]].values - hm_thresholds[0:d]) * hm_positions[0:d]) > 0, 1, 0) , axis=-1)
+
+                 # number of features in the separation set that are classified as music
+                M_p = np.sum(np.where(((feature_statistics_df[sp_features[0:e]].values - sp_thresholds[0:e]) * sp_music_positions[0:e]) > 0, 1, 0) , axis=-1)
+
+                # number of segments
+                n_segments = feature_statistics_df.count()[0]
+
+                # initial classification label
+                Di = np.zeros(n_segments)
+
+                # initial classification for each segment
+                for j in range(n_segments):
+                    if (S_x > 0 and M_x == 0 and M_h == 0) or (S_x > 1 and Mx == 0) or (S_h > alpha*c and M_h == 0):
+                        Di[j] = 1.0
+                    elif (M_x > 0 and S_x == 0 and S_x == 0) or (M_x > 1 and S_x == 0) or (M_h > alpha*d and S_h == 0):
+                        Di[j] -1.0
+                    else:
+                        Di[j] = 1.0 * (S_p - M_p) / e
+
+                return Di
+
+            # cross-validation to get scores
+            for a in range(1, max_feature+1, 2): # a is number of features used in extreme speech threshold
+                for b in range(1, max_feature+1, 2): # b is number of features used in extreme music threshold
+                    for c in range(1, max_feature+1, 2): # c is number of features used in high probability speech threshold
+                        for d in range(1, max_feature+1, 2): # d is number of features used in high probability music threshold
+                            for e in range(1, max_feature+1, 2): # e is number of features used in separation threshold
+                                speech_test_resault = segmentation(speech_test,a,b,c,d,e)
+                                music_test_resault = segmentation(music_test,a,b,c,d,e)
+                                test_score = np.where([speech_test_resault>0,music_test_resault<0], 1, 0).mean()
+                                if cv_score.get('{}_{}_{}_{}_{}'.format(a,b,c,d,e), None) == None:
+                                    cv_score['{}_{}_{}_{}_{}'.format(a,b,c,d,e)] = test_score
+                                else:
+                                    cv_score['{}_{}_{}_{}_{}'.format(a,b,c,d,e)] += test_score
+
+                                self._logger.info("{}'th cross-validation fold!\n extreme speech features number: {}\n extreme music features number: {}\n, high speech features number: {}\n, high music features number: {}, separation features number: {}\n, accuracy: {}".format(i+1,a,b,c,d,e,test_score))
+
+            
+
+
+
+
+
+
+
 
 
 
