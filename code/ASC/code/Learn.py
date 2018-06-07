@@ -502,7 +502,7 @@ class Train(builtins.object):
         if not self._with_statistics in ['True', 'true']:
             self._write_all_statistics()
         
-        # self._write_feature_ranking()
+        self._write_feature_ranking()
         self._cross_validation()
 
 
@@ -665,7 +665,7 @@ class Train(builtins.object):
         framed_data = lrs.util.frame(self._data,\
                                      frame_length=self._frame_length,\
                                      hop_length=self._frame_hop_length).transpose()
-        ste = 10 * np.log10(1.0 / self._frame_length * np.sum(framed_data**2, axis=-1) + 1)
+        ste = 10 * np.log10(1.0 / self._frame_length * (np.sum(framed_data**2, axis=-1) + 0.0000001))
 
         return ste
 
@@ -700,12 +700,12 @@ class Train(builtins.object):
         stft_matrix = self._stft()
         stft_square = stft_matrix**2
 
-        total_energy = np.sum(stft_square[:,1:]) + 0.0000001 # avoid being diveded by zero
+        total_energy = np.sum(stft_square[:,1:]) + 0.00000000001 # avoid being diveded by zero
         low_energy = np.sum(stft_square[:, 1 : int(low_band_bound/self._operating_rate*self._n_fft)], axis=-1)
         high_energy = np.sum(stft_square[:, int(high_band_bound/self._operating_rate*self._n_fft):], axis=-1)
 
-        low = 10 * np.log10(low_energy / total_energy + 0.0000001)
-        high = 10 * np.log10(high_energy / total_energy + 0.0000001)
+        low = 10 * np.log10((low_energy+0.00000000001) / total_energy)
+        high = 10 * np.log10((high_energy+0.00000000001) / total_energy)
 
         return low, high
 
@@ -727,7 +727,7 @@ class Train(builtins.object):
                                      hop_length=self._frame_hop_length).transpose()
 
         # caculate the normalization factors for each frame
-        norm_factors = np.sum(framed_data**2, axis=-1) + 0.0000001
+        norm_factors = np.sum(framed_data**2, axis=-1) + 0.00000000001
 
         # pre-allocate the peak array
         peak = np.sum(framed_data[:, 0 : self._frame_length-m_1] * framed_data[:, m_1:], axis=-1)
@@ -757,7 +757,7 @@ class Train(builtins.object):
 
         mfcc_diff = mfcc[1:, :] - mfcc[0 : -1, :]
         mfcc_diff_norm_factor = np.linalg.norm(mfcc_diff, ord=2, axis=-1, keepdims=True) #2-norm, Euclidean norm
-        mfcc_diff_norm = mfcc_diff / (mfcc_diff_norm_factor + 0.0000001)
+        mfcc_diff_norm = mfcc_diff / (mfcc_diff_norm_factor + 0.00000000001)
 
         return mfcc, mfcc_diff_norm
 
@@ -1609,9 +1609,9 @@ class Train(builtins.object):
 
         """
         self._logger.info("Start cross validation to choose features!")
-        K_fold = 5
+        K_fold = 1
         # maximum features for each threshold
-        max_feature = 15
+        max_feature = 5
         # dict of cv score
         cv_score = {}
 
@@ -1628,12 +1628,12 @@ class Train(builtins.object):
 
         self._logger.info("loading all kinds of ranking list!")
         # load all kinds of ranking list
-        with open(os.path.join(self._model_files_dir, 'es_paper_ranking'), 'rb') as f:
+        with open(os.path.join(self._model_files_dir, 'es_powerlist_ranking'), 'rb') as f:
             es_powerlist_ranking = pickle.load(f)
             es_features = [power.name_ for power in es_powerlist_ranking[0:max_feature]]
             es_positions = np.array([-1 if power._speech_position == 'left' else 1 for power in es_powerlist_ranking[0:max_feature]])
 
-        with open(os.path.join(self._model_files_dir, 'em_paper_ranking'), 'rb') as f:
+        with open(os.path.join(self._model_files_dir, 'em_powerlist_ranking'), 'rb') as f:
             em_powerlist_ranking = pickle.load(f)
             em_features = [power.name_ for power in em_powerlist_ranking[0:max_feature]]
             em_positions = np.array([-1 if power._music_position == 'left' else 1 for power in em_powerlist_ranking[0:max_feature]])
@@ -1791,13 +1791,13 @@ class Train(builtins.object):
             # cross-validation to get scores
             for a in range(1, 1+1,1): # a is number of features used in extreme speech threshold
                 for b in range(1, 1+1,1): # b is number of features used in extreme music threshold
-                    for c in range(1, 30+1,1): # c is number of features used in high probability speech threshold
+                    for c in range(1, max_feature+1,1): # c is number of features used in high probability speech threshold
                         start = time.time()
-                        for d in range(1, 30+1,1): # d is number of features used in high probability music threshold
-                            # initialize the max score
-                            max_score = -np.inf
+                        # initialize the max score
+                        max_score = -np.inf
+                        for d in range(1, max_feature+1,1): # d is number of features used in high probability music threshold
                             a_max, b_max, c_max, d_max, e_max = 0, 0, 0, 0, 0
-                            for e in range(1, 30+1,1): # e is number of features used in separation threshold
+                            for e in range(1, max_feature+1,1): # e is number of features used in separation threshold
                                 speech_test_resault = segmentation(speech_test,a,b,c,d,e)
                                 music_test_resault = segmentation(music_test,a,b,c,d,e)
                                 test_score = (np.where(speech_test_resault>0, 1, 0).sum() + np.where(music_test_resault<0, 1, 0).sum()) / (speech_test_resault.size + music_test_resault.size)
@@ -1809,14 +1809,14 @@ class Train(builtins.object):
                                     max_score = test_score
                                     a_max, b_max, c_max, d_max, e_max = a, b, c, d, e
                         
-                            self._logger.info("{}'th cv fold!\nes: {}\nem: {}\nhs: {}\nhm: {}\nsp: {}\nBEST ACCURACY: {}".format(i+1,a_max,b_max,c_max,d_max,e_max,max_score))
+                        self._logger.info("{}'th cv fold!\nes: {}\nem: {}\nhs: {}\nhm: {}\nsp: {}\nBEST ACCURACY: {}".format(i+1,a_max,b_max,c_max,d_max,e_max,max_score))
 
                         # compute and show how long the to be done.
-                        # cost_one = time.time() - start
-                        # cost = cost_one * (7**3-((a-1)/2*7**2+(b-1)/2*7+(c+1)/2))
-                        # hour = int(cost/3600)
-                        # minute = int((cost%3600)/60)
-                        # self._logger.info("{} hour - {} minute to be done!".format(hour, minute))
+                        cost_one = time.time() - start
+                        cost = cost_one * (10*10*max_feature-((a-1)*10*max_feature+(b-1)*max_feature+c)) * K_fold
+                        hour = int(cost/3600)
+                        minute = int((cost%3600)/60)
+                        self._logger.info("{} hour - {} minute to be done!".format(hour, minute))
 
 
         # get the average score and transform dict to list
