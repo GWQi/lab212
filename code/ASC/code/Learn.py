@@ -1611,7 +1611,7 @@ class Train(builtins.object):
         self._logger.info("Start cross validation to choose features!")
         K_fold = 5
         # maximum features for each threshold
-        max_feature = 30
+        max_feature = 10
         # dict of cv score
         cv_score = {}
 
@@ -1789,15 +1789,15 @@ class Train(builtins.object):
                 return Di
 
             # cross-validation to get scores
-            for a in range(1, 6+1,1): # a is number of features used in extreme speech threshold
-                for b in range(1, 6+1,1): # b is number of features used in extreme music threshold
-                    for c in range(1, 20+1,1): # c is number of features used in high probability speech threshold
+            for a in range(1, 3+1,1): # a is number of features used in extreme speech threshold
+                for b in range(1, 3+1,1): # b is number of features used in extreme music threshold
+                    for c in range(1, 5+1,1): # c is number of features used in high probability speech threshold
                         start = time.time()
                         # initialize the max score
                         max_score = -np.inf
                         a_max, b_max, c_max, d_max, e_max = 0, 0, 0, 0, 0
-                        for d in range(1, 20+1,1): # d is number of features used in high probability music threshold
-                            for e in range(1, max_feature+1,1): # e is number of features used in separation threshold
+                        for d in range(1, 5+1,1): # d is number of features used in high probability music threshold
+                            for e in range(1, 10+1,1): # e is number of features used in separation threshold
                                 speech_test_resault = segmentation(speech_test,a,b,c,d,e)
                                 music_test_resault = segmentation(music_test,a,b,c,d,e)
                                 test_score = (np.where(speech_test_resault>0, 1, 0).sum() + np.where(music_test_resault<0, 1, 0).sum()) / (speech_test_resault.size + music_test_resault.size)
@@ -1813,7 +1813,7 @@ class Train(builtins.object):
 
                         # compute and show how long the to be done.
                         cost_one = time.time() - start
-                        cost = cost_one * (6*6*20-((a-1)*6*20+(b-1)*20+c)) * K_fold
+                        cost = cost_one * (3*3*5-((a-1)*3*5+(b-1)*10+c)) * K_fold
                         hour = int(cost/3600)
                         minute = int((cost%3600)/60)
                         self._logger.info("{} hour - {} minute to be done!".format(hour, minute))
