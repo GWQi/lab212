@@ -502,7 +502,7 @@ class Train(builtins.object):
         if not self._with_statistics in ['True', 'true']:
             self._write_all_statistics()
         
-        self._write_feature_ranking()
+        # self._write_feature_ranking()
         # self._write_cross_validation()
 
 
