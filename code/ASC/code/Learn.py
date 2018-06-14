@@ -1535,47 +1535,48 @@ class Train(builtins.object):
 
         # ranked features
         sp_powerlist_ranking = []
+        
 
-        # initialize highest score and name of the feature who has the highest score for now
-        highest_score = -np.inf
-        name_selected = ''
+        # # initialize highest score and name of the feature who has the highest score for now
+        # highest_score = -np.inf
+        # name_selected = ''
 
-        # find the feature which has highest separation threshold separetion power
-        for power_remaining in powerlist_remaining:
-            if power_remaining.sp_power_ > highest_score:
-                highest_score = power_remaining.sp_power_
-                name_selected = power_remaining.name_
+        # # find the feature which has highest separation threshold separetion power
+        # for power_remaining in powerlist_remaining:
+        #     if power_remaining.sp_power_ > highest_score:
+        #         highest_score = power_remaining.sp_power_
+        #         name_selected = power_remaining.name_
 
-        # search the power whose name is name_selected in powerlist_remaining, remove it from powerlist_remaining and append it back to em_powerlist_ranking
-        for power_remaining in powerlist_remaining:
-            if power_remaining.name_ == name_selected:
-                sp_powerlist_ranking.append(power_remaining)
-                powerlist_remaining.remove(power_remaining)
+        # # search the power whose name is name_selected in powerlist_remaining, remove it from powerlist_remaining and append it back to em_powerlist_ranking
+        # for power_remaining in powerlist_remaining:
+        #     if power_remaining.name_ == name_selected:
+        #         sp_powerlist_ranking.append(power_remaining)
+        #         powerlist_remaining.remove(power_remaining)
 
-        while len(powerlist_remaining) != 0:
-            # initialize highest score and name of the feature who has the highest score for now
-            highest_score = -np.inf
-            name_selected = ''
+        # while len(powerlist_remaining) != 0:
+        #     # initialize highest score and name of the feature who has the highest score for now
+        #     highest_score = -np.inf
+        #     name_selected = ''
 
-            for power_remaining in powerlist_remaining:
-                # initialize the sum of mutual correlation between power(feature) remaining and each power(feature) ranked
-                corr_sum = 0
+        #     for power_remaining in powerlist_remaining:
+        #         # initialize the sum of mutual correlation between power(feature) remaining and each power(feature) ranked
+        #         corr_sum = 0
                 
-                for power_ranking in sp_powerlist_ranking:
-                    corr_sum = corr_sum + cos_similities[power_remaining.name_+'_'+power_ranking.name_]
+        #         for power_ranking in sp_powerlist_ranking:
+        #             corr_sum = corr_sum + cos_similities[power_remaining.name_+'_'+power_ranking.name_]
                 
-                score = self._alpha * power_remaining.sp_power_ - self._beta * corr_sum / len(sp_powerlist_ranking)
+        #         score = self._alpha * power_remaining.sp_power_ - self._beta * corr_sum / len(sp_powerlist_ranking)
                 
-                # if the usefullness score of this feature is higher than the highest_score, change the highest_score and name_selected
-                if score > highest_score:
-                    highest_score = score
-                    name_selected = power_remaining.name_
+        #         # if the usefullness score of this feature is higher than the highest_score, change the highest_score and name_selected
+        #         if score > highest_score:
+        #             highest_score = score
+        #             name_selected = power_remaining.name_
 
-            # search the power whose name is name_selected in powerlist_remaining, remove it from powerlist_remaining and append it back to es_powerlist_ranking
-            for power_remaining in powerlist_remaining:
-                if power_remaining.name_ == name_selected:
-                    sp_powerlist_ranking.append(power_remaining)
-                    powerlist_remaining.remove(power_remaining)
+        #     # search the power whose name is name_selected in powerlist_remaining, remove it from powerlist_remaining and append it back to es_powerlist_ranking
+        #     for power_remaining in powerlist_remaining:
+        #         if power_remaining.name_ == name_selected:
+        #             sp_powerlist_ranking.append(power_remaining)
+        #             powerlist_remaining.remove(power_remaining)
         self._logger.info("Compute separation threshold separation power features' ranking done!")
 
         return es_powerlist_ranking, em_powerlist_ranking, hs_powerlist_ranking, hm_powerlist_ranking, sp_powerlist_ranking
