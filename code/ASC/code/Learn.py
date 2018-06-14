@@ -503,7 +503,7 @@ class Train(builtins.object):
             self._write_all_statistics()
         
         self._write_feature_ranking()
-        self._write_cross_validation()
+        # self._write_cross_validation()
 
 
 
@@ -1053,10 +1053,11 @@ class Train(builtins.object):
         ste_segmented = lrs.util.frame(ste, frame_length=self._nframes_asegment, hop_length=self._nframes_asegment_hop).transpose()
 
         # reshape the mean can be broadcast
-        ste_mean_asegment = np.mean(ste_segmented, axis=-1).reshape(-1,1)
+        ste_mean_asegment = ste_segmented.mean(axis=-1).reshape(-1,1)
 
         # this looks like more complex than we thought, because the output of np.sign function can be -1, 0 or 1.
-        LSTER = 1.0 * np.sum((np.sign(np.sign(1.0/3 * ste_mean_asegment - ste_segmented) * 2 - 1) + 1), axis=-1) / (2 * self._nframes_asegment)
+        LSTER = np.where((1.0/3 * ste_mean_asegment - ste_segmented) > 0, 1, 0).mean(axis=-1)
+        # LSTER = 1.0 * np.sum((np.sign(np.sign(1.0/3 * ste_mean_asegment - ste_segmented) * 2 - 1) + 1), axis=-1) / (2 * self._nframes_asegment)
 
         return LSTER
 
@@ -1535,7 +1536,7 @@ class Train(builtins.object):
 
         # ranked features
         sp_powerlist_ranking = []
-        
+
 
         # # initialize highest score and name of the feature who has the highest score for now
         # highest_score = -np.inf
