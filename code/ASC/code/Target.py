@@ -31,11 +31,15 @@ class Test(object):
         config : dict, dict of target configeration
 
         es_features :
-        es_thresholds_left :
-        es_thresholds_right :
+        # es_thresholds_left :
+        # es_thresholds_right :
+        es_thresholds
+        es_positions
         em_features :
-        em_thresholds_left :
-        em_thresholds_right :
+        # em_thresholds_left :
+        # em_thresholds_right :
+        em_thresholds
+        em_positions
         hs_features :
         hs_thresholds :
         hs_positions :
@@ -62,7 +66,7 @@ class Test(object):
         T_min :
 
     """
-    def __init__(self, system, cfg):
+    def configure(self, system, cfg):
 
         # ***************************system setting configuration******************************
         try:
@@ -118,10 +122,10 @@ class Test(object):
         self._statistics_column_values.extend(['mfcc_std_{}'.format(i) for i in range(1, self._mfcc_order+1)])
         self._statistics_column_values.extend(['mfcc_mean_diff_{}'.format(i) for i in range(1, self._mfcc_order+1)])
         self._statistics_column_values.extend(['mfcc_std_diff_{}'.format(i) for i in range(1, self._mfcc_order+1)])
-        self._statistics_column_values.extend(['mfccdn_mean_{}'.format(i) for i in range(1, self._mfcc_order+1)])
-        self._statistics_column_values.extend(['mfccdn_std_{}'.format(i) for i in range(1, self._mfcc_order+1)])
-        self._statistics_column_values.extend(['mfccdn_mean_diff_{}'.format(i) for i in range(1, self._mfcc_order+1)])
-        self._statistics_column_values.extend(['mfccdn_std_diff_{}'.format(i) for i in range(1, self._mfcc_order+1)])
+        # self._statistics_column_values.extend(['mfccdn_mean_{}'.format(i) for i in range(1, self._mfcc_order+1)])
+        # self._statistics_column_values.extend(['mfccdn_std_{}'.format(i) for i in range(1, self._mfcc_order+1)])
+        # self._statistics_column_values.extend(['mfccdn_mean_diff_{}'.format(i) for i in range(1, self._mfcc_order+1)])
+        # self._statistics_column_values.extend(['mfccdn_std_diff_{}'.format(i) for i in range(1, self._mfcc_order+1)])
         self._statistics_column_values.extend(['rolloff_mean', 'rolloff_std', 'rolloff_mean_diff', 'rolloff_std_diff',
                                                'centroid_mean', 'centroid_std', 'centroid_mean_diff', 'centroid_std_diff',
                                                'flux_mean', 'flux_std', 'flux_mean_diff', 'flux_std_diff',
@@ -130,13 +134,17 @@ class Test(object):
 
         # the best n features for extreme speech threshold and its corresponding extrem speech threshold
         self.es_features = [power.name_ for power in self.es_ranking_list[0:self.setting['n_es_features']]]
-        self.es_thresholds_left = np.array([power.extreme_speech_left_ for power in self.es_ranking_list[0:self.setting['n_es_features']]])
-        self.es_thresholds_right = np.array([power.extreme_speech_right_ for power in self.es_ranking_list[0:self.setting['n_es_features']]])
+        # self.es_thresholds_left = np.array([power.extreme_speech_left_ for power in self.es_ranking_list[0:self.setting['n_es_features']]])
+        # self.es_thresholds_right = np.array([power.extreme_speech_right_ for power in self.es_ranking_list[0:self.setting['n_es_features']]])
+        self.es_thresholds = [power.extreme_speech_ for power in self.es_ranking_list[0:self.setting['n_es_features']]]
+        self.es_positions = [-1 if power._speech_position == 'left' else 1 for power in self.es_ranking_list[0:self.setting['n_es_features']]]
 
         # the best n features for extreme music threshold and its corresponding extrem music threshold
         self.em_features = [power.name_ for power in self.em_ranking_list[0:self.setting['n_em_features']]]
-        self.em_thresholds_left = np.array([power.extreme_music_left_ for power in self.em_ranking_list[0:self.setting['n_em_features']]])
-        self.em_thresholds_right = np.array([power.extreme_music_right_ for power in self.em_ranking_list[0:self.setting['n_em_features']]])
+        # self.em_thresholds_left = np.array([power.extreme_music_left_ for power in self.em_ranking_list[0:self.setting['n_em_features']]])
+        # self.em_thresholds_right = np.array([power.extreme_music_right_ for power in self.em_ranking_list[0:self.setting['n_em_features']]])
+        self.em_thresholds = [power.exteme_music_ for power in self.em_ranking_list[0:self.setting['n_em_features']]]
+        self.em_positions = [-1 if power._music_position == 'left' else 1 for power in self.em_ranking_list[0:self.setting['n_em_features']]]
 
         # the best n features for high probibality speech threshold and its corresponding high propability speech threshold,
         # speech/music statistics position, -1 indicate 'left', 1 indicate right
@@ -344,11 +352,11 @@ class Test(object):
                                 n_fft=self._frame_length,\
                                 hop_length=self._frame_hop_length).transpose()
 
-        mfcc_diff = mfcc[1:, :] - mfcc[0 : -1, :]
-        mfcc_diff_norm_factor = np.linalg.norm(mfcc_diff, ord=2, axis=-1, keepdims=True) #2-norm, Euclidean norm
-        mfcc_diff_norm = mfcc_diff / (mfcc_diff_norm_factor + 0.0000001)
+        # mfcc_diff = mfcc[1:, :] - mfcc[0 : -1, :]
+        # mfcc_diff_norm_factor = np.linalg.norm(mfcc_diff, ord=2, axis=-1, keepdims=True) #2-norm, Euclidean norm
+        # mfcc_diff_norm = mfcc_diff / (mfcc_diff_norm_factor + 0.0000001)
 
-        return mfcc, mfcc_diff_norm
+        return mfcc # , mfcc_diff_norm
 
     def _spectrum_rolloff(self):
         """
@@ -518,12 +526,12 @@ class Test(object):
             mfcc_diff_norm_mean_diff : np.ndarray, shape=(n_segments, self._mfcc_order)
             mfcc_diff_norm_std_diff : np.ndarray, shape=(n_segments, self._mfcc_order)
         """
-        mfcc, mfcc_diff_norm = self._mfcc()
-
+        # mfcc, mfcc_diff_norm = self._mfcc()
+        mfcc = self._mfcc()
         # because each MFC coefficient is considered as one independ feature, so mfcc matrix and mfcc_diff_norm feature matrix
         # must be handled one column by one column, and then append them togather
         mfcc_mean, mfcc_std, _, mfcc_mean_diff, mfcc_std_diff, __ = self._feature_statistics_helper_one(mfcc[:, 0])
-        mfcc_diff_norm_mean, mfcc_diff_norm_std, mfcc_diff_norm_mean_diff, mfcc_diff_norm_std_diff = self._feature_statistics_helper_two(mfcc_diff_norm[:, 0])
+        # mfcc_diff_norm_mean, mfcc_diff_norm_std, mfcc_diff_norm_mean_diff, mfcc_diff_norm_std_diff = self._feature_statistics_helper_two(mfcc_diff_norm[:, 0])
        
         # reshape to be appended
         mfcc_mean = mfcc_mean.reshape(-1,1)
@@ -531,27 +539,27 @@ class Test(object):
         mfcc_mean_diff = mfcc_mean_diff.reshape(-1,1)
         mfcc_std_diff = mfcc_std_diff.reshape(-1,1)
 
-        mfcc_diff_norm_mean = mfcc_diff_norm_mean.reshape(-1,1)
-        mfcc_diff_norm_std = mfcc_diff_norm_std.reshape(-1,1)
-        mfcc_diff_norm_mean_diff = mfcc_diff_norm_mean_diff.reshape(-1,1)
-        mfcc_diff_norm_std_diff = mfcc_diff_norm_std_diff.reshape(-1,1)
+        # mfcc_diff_norm_mean = mfcc_diff_norm_mean.reshape(-1,1)
+        # mfcc_diff_norm_std = mfcc_diff_norm_std.reshape(-1,1)
+        # mfcc_diff_norm_mean_diff = mfcc_diff_norm_mean_diff.reshape(-1,1)
+        # mfcc_diff_norm_std_diff = mfcc_diff_norm_std_diff.reshape(-1,1)
 
         # handle the mfcc and mfcc_diff_matrix one column by one column
         for i in range(1, self._mfcc_order):
             mfcc_mean_, mfcc_std_, _, mfcc_mean_diff_, mfcc_std_diff_, __ = self._feature_statistics_helper_one(mfcc[:, i])
-            mfcc_diff_norm_mean_, mfcc_diff_norm_std_, mfcc_diff_norm_mean_diff_, mfcc_diff_norm_std_diff_ = self._feature_statistics_helper_two(mfcc_diff_norm[:, i])
+            # mfcc_diff_norm_mean_, mfcc_diff_norm_std_, mfcc_diff_norm_mean_diff_, mfcc_diff_norm_std_diff_ = self._feature_statistics_helper_two(mfcc_diff_norm[:, i])
 
             mfcc_mean = np.append(mfcc_mean, mfcc_mean_.reshape(-1,1), axis=-1)
             mfcc_std = np.append(mfcc_std, mfcc_std_.reshape(-1,1), axis=-1)
             mfcc_mean_diff = np.append(mfcc_mean_diff, mfcc_mean_diff_.reshape(-1,1), axis=-1)
             mfcc_std_diff = np.append(mfcc_std_diff, mfcc_std_diff_.reshape(-1,1), axis=-1)
 
-            mfcc_diff_norm_mean = np.append(mfcc_diff_norm_mean, mfcc_diff_norm_mean_.reshape(-1,1), axis=-1)
-            mfcc_diff_norm_std = np.append(mfcc_diff_norm_std, mfcc_diff_norm_std_.reshape(-1,1), axis=-1)
-            mfcc_diff_norm_mean_diff = np.append(mfcc_diff_norm_mean_diff, mfcc_diff_norm_mean_diff_.reshape(-1,1), axis=-1)
-            mfcc_diff_norm_std_diff = np.append(mfcc_diff_norm_std_diff, mfcc_diff_norm_std_diff_.reshape(-1,1), axis=-1)
+            # mfcc_diff_norm_mean = np.append(mfcc_diff_norm_mean, mfcc_diff_norm_mean_.reshape(-1,1), axis=-1)
+            # mfcc_diff_norm_std = np.append(mfcc_diff_norm_std, mfcc_diff_norm_std_.reshape(-1,1), axis=-1)
+            # mfcc_diff_norm_mean_diff = np.append(mfcc_diff_norm_mean_diff, mfcc_diff_norm_mean_diff_.reshape(-1,1), axis=-1)
+            # mfcc_diff_norm_std_diff = np.append(mfcc_diff_norm_std_diff, mfcc_diff_norm_std_diff_.reshape(-1,1), axis=-1)
 
-        return mfcc_mean, mfcc_std, mfcc_mean_diff, mfcc_std_diff, mfcc_diff_norm_mean, mfcc_diff_norm_std, mfcc_diff_norm_mean_diff, mfcc_diff_norm_std_diff
+        return mfcc_mean, mfcc_std, mfcc_mean_diff, mfcc_std_diff # , mfcc_diff_norm_mean, mfcc_diff_norm_std, mfcc_diff_norm_mean_diff, mfcc_diff_norm_std_diff
 
     def _spectrum_rolloff_statistics(self):
         """
@@ -726,9 +734,6 @@ class Test(object):
 
         return feature_statistics_df
 
-    def 
-
-
 
     def _segmentation(self, feature_statistics_df):
         """
@@ -738,12 +743,15 @@ class Test(object):
             feature_statistics_df : pandas.DataFrame, shape=(n_segments, m_features)
         
         return:
+            Di : <np.ndarray, np.float64>, shape=(n_segments,), initial classification
+            Ds : <np.ndarray, np.float64>, shape=(n_segments,), smoothed classification
             Db : np.ndarray, shape=(n_segments,), -1 or 1, -1 -> music, 1 -> speech
         """
         # number of features above its corresponding extrem speech threshold
-        S_ex_left = np.where((feature_statistics_df[self.es_features].values - self.es_thresholds_left) < 0, 1, 0)
-        S_ex_right = np.where((feature_statistics_df[self.es_features].values - self.es_thresholds_right) > 0, 1, 0)
-        S_x = np.sum(S_ex_left + S_ex_right, axis=-1)
+        # S_ex_left = np.where((feature_statistics_df[self.es_features].values - self.es_thresholds_left) < 0, 1, 0)
+        # S_ex_right = np.where((feature_statistics_df[self.es_features].values - self.es_thresholds_right) > 0, 1, 0)
+        # S_x = np.sum(S_ex_left + S_ex_right, axis=-1)
+        S_x = np.sum(np.where(((feature_statistics_df[self.es_features].values - self.es_thresholds) * self.es_positions) > 0, 1, 0), axis=-1)
 
         # number of features above its corresponding high probability speech threshold
         S_h = np.sum(np.where(((feature_statistics_df[self.hs_features].values - self.hs_thresholds) * self.hs_positions) > 0, 1, 0) , axis=-1)
@@ -752,9 +760,11 @@ class Test(object):
         S_p = np.sum(np.where(((feature_statistics_df[self.sp_features].values - self.sp_thresholds) * self.sp_speech_positions) > 0, 1, 0) , axis=-1)
 
         # number of features above its corresponding extrem music threshold
-        M_ex_left = np.where((feature_statistics_df[self.em_features].values - self.em_thresholds_left) < 0, 1, 0)
-        M_ex_right = np.where((feature_statistics_df[self.em_features].values - self.em_thresholds_right) > 0, 1, 0)
-        M_x = np.sum(M_ex_left + M_ex_right, axis=-1)
+        # M_ex_left = np.where((feature_statistics_df[self.em_features].values - self.em_thresholds_left) < 0, 1, 0)
+        # M_ex_right = np.where((feature_statistics_df[self.em_features].values - self.em_thresholds_right) > 0, 1, 0)
+        # M_x = np.sum(M_ex_left + M_ex_right, axis=-1)
+        M_x = np.sum(np.where(((feature_statistics_df[self.em_features].values - self.em_thresholds) * self.em_positions) > 0, 1, 0), axis=-1)
+
 
         # number of features above its corresponding high probability music threshold
         M_h = np.sum(np.where(((feature_statistics_df[self.hm_features].values - self.hm_thresholds) * self.hm_positions) > 0, 1, 0) , axis=-1)
@@ -795,7 +805,7 @@ class Test(object):
         for i in range(1, n_segments):
             if Ds[i] >= T:
                 Db[i] = 1
-            elif Ds[i] =< (-T):
+            elif Ds[i] <= (-T):
                 Db[i] = -1
             else:
                 if Ds[i] < Ds[i-1]:
@@ -807,12 +817,18 @@ class Test(object):
             else:
                 T = self.T_init
 
-        return Db
+        return Di, Ds, Db
 
 
-    def tag(self):
+    def tag_single(self, **kwargs):
         """
-        this function can be called to tag files
+        this function can be called to tag one wav file
+        """
+        pass
+
+    def tag_batch(self):
+        """
+        this function can be called to tag batch wav/s
         """
         
 
