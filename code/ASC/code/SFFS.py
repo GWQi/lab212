@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import copy
 
-def SFFS(speech_df, music_df):
+def SFFS(speech_df, music_df, logger):
     """
     we will not change the value of parameters in this function
     realize sequential floating forward search.
@@ -33,10 +33,11 @@ def SFFS(speech_df, music_df):
     count = 2
     # keep sequential floating forward search running until there has not any feature left in feature_r
     while(len(features_r) != 0):
-        print("************************************************************")
-        print("features_k has {} member: {}".format(len(features_k), features_k))
-        print("J_k has {} member: {}".format(len(J_k), J_k))
-        print("Now k is: {}".format(k))
+        content = "************************************************************\n"
+        content += "features_k has {} member: {}".format(len(features_k), features_k) + '\n'
+        content += "J_k has {} member: {}".format(len(J_k), J_k) + '\n'
+        content += "Now k is: {}".format(k) + '\n'
+        logger.info(content)
         # step 1: select k+1'th feature from remaining feature set, features_r, to form feature set X_(k+1)
         fea_step_1, J_step_1 = SFS_select(speech_df, music_df, features_k, features_r)
         features_k.append(fea_step_1)
