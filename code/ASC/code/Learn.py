@@ -15,6 +15,9 @@ import gc
 import copy
 import pickle
 import time
+import SFFS
+import zipfile
+import yaml
 
 from tools.readlabel import readlabel
 from Config import Config
@@ -488,10 +491,10 @@ class Train(builtins.object):
         self._statistics_column_values.extend(['mfcc_std_{}'.format(i) for i in range(1, self._mfcc_order+1)])
         self._statistics_column_values.extend(['mfcc_mean_diff_{}'.format(i) for i in range(1, self._mfcc_order+1)])
         self._statistics_column_values.extend(['mfcc_std_diff_{}'.format(i) for i in range(1, self._mfcc_order+1)])
-        self._statistics_column_values.extend(['mfccdn_mean_{}'.format(i) for i in range(1, self._mfcc_order+1)])
-        self._statistics_column_values.extend(['mfccdn_std_{}'.format(i) for i in range(1, self._mfcc_order+1)])
-        self._statistics_column_values.extend(['mfccdn_mean_diff_{}'.format(i) for i in range(1, self._mfcc_order+1)])
-        self._statistics_column_values.extend(['mfccdn_std_diff_{}'.format(i) for i in range(1, self._mfcc_order+1)])
+        # self._statistics_column_values.extend(['mfccdn_mean_{}'.format(i) for i in range(1, self._mfcc_order+1)])
+        # self._statistics_column_values.extend(['mfccdn_std_{}'.format(i) for i in range(1, self._mfcc_order+1)])
+        # self._statistics_column_values.extend(['mfccdn_mean_diff_{}'.format(i) for i in range(1, self._mfcc_order+1)])
+        # self._statistics_column_values.extend(['mfccdn_std_diff_{}'.format(i) for i in range(1, self._mfcc_order+1)])
         self._statistics_column_values.extend(['rolloff_mean', 'rolloff_std', 'rolloff_mean_diff', 'rolloff_std_diff',
                                                'centroid_mean', 'centroid_std', 'centroid_mean_diff', 'centroid_std_diff',
                                                'flux_mean', 'flux_std', 'flux_mean_diff', 'flux_std_diff',
@@ -499,11 +502,12 @@ class Train(builtins.object):
                                                'lster'])
 
 
-        if not self._with_statistics in ['True', 'true']:
-            self._write_all_statistics()
+        # if not self._with_statistics in ['True', 'true']:
+        #     self._write_all_statistics()
         
-        self._write_feature_ranking()
-        self._write_cross_validation()
+        # self._write_feature_ranking()
+        # self._write_cross_validation()
+        self.pop_system()
 
 
 
@@ -755,11 +759,11 @@ class Train(builtins.object):
                                 n_fft=self._frame_length,\
                                 hop_length=self._frame_hop_length).transpose()
 
-        mfcc_diff = mfcc[1:, :] - mfcc[0 : -1, :]
-        mfcc_diff_norm_factor = np.linalg.norm(mfcc_diff, ord=2, axis=-1, keepdims=True) #2-norm, Euclidean norm
-        mfcc_diff_norm = mfcc_diff / (mfcc_diff_norm_factor + 0.00000000001)
+        # mfcc_diff = mfcc[1:, :] - mfcc[0 : -1, :]
+        # mfcc_diff_norm_factor = np.linalg.norm(mfcc_diff, ord=2, axis=-1, keepdims=True) #2-norm, Euclidean norm
+        # mfcc_diff_norm = mfcc_diff / (mfcc_diff_norm_factor + 0.00000000001)
 
-        return mfcc, mfcc_diff_norm
+        return mfcc # , mfcc_diff_norm
 
     def _spectrum_rolloff(self):
         """
@@ -930,12 +934,12 @@ class Train(builtins.object):
             mfcc_diff_norm_mean_diff : np.ndarray, shape=(n_segments, self._mfcc_order)
             mfcc_diff_norm_std_diff : np.ndarray, shape=(n_segments, self._mfcc_order)
         """
-        mfcc, mfcc_diff_norm = self._mfcc()
-
+        # mfcc, mfcc_diff_norm = self._mfcc()
+        mfcc = self._mfcc()
         # because each MFC coefficient is considered as one independ feature, so mfcc matrix and mfcc_diff_norm feature matrix
         # must be handled one column by one column, and then append them togather
         mfcc_mean, mfcc_std, _, mfcc_mean_diff, mfcc_std_diff, __ = self._feature_statistics_helper_one(mfcc[:, 0])
-        mfcc_diff_norm_mean, mfcc_diff_norm_std, mfcc_diff_norm_mean_diff, mfcc_diff_norm_std_diff = self._feature_statistics_helper_two(mfcc_diff_norm[:, 0])
+        # mfcc_diff_norm_mean, mfcc_diff_norm_std, mfcc_diff_norm_mean_diff, mfcc_diff_norm_std_diff = self._feature_statistics_helper_two(mfcc_diff_norm[:, 0])
        
         # reshape to be appended
         mfcc_mean = mfcc_mean.reshape(-1,1)
@@ -943,27 +947,27 @@ class Train(builtins.object):
         mfcc_mean_diff = mfcc_mean_diff.reshape(-1,1)
         mfcc_std_diff = mfcc_std_diff.reshape(-1,1)
 
-        mfcc_diff_norm_mean = mfcc_diff_norm_mean.reshape(-1,1)
-        mfcc_diff_norm_std = mfcc_diff_norm_std.reshape(-1,1)
-        mfcc_diff_norm_mean_diff = mfcc_diff_norm_mean_diff.reshape(-1,1)
-        mfcc_diff_norm_std_diff = mfcc_diff_norm_std_diff.reshape(-1,1)
+        # mfcc_diff_norm_mean = mfcc_diff_norm_mean.reshape(-1,1)
+        # mfcc_diff_norm_std = mfcc_diff_norm_std.reshape(-1,1)
+        # mfcc_diff_norm_mean_diff = mfcc_diff_norm_mean_diff.reshape(-1,1)
+        # mfcc_diff_norm_std_diff = mfcc_diff_norm_std_diff.reshape(-1,1)
 
         # handle the mfcc and mfcc_diff_matrix one column by one column
         for i in range(1, self._mfcc_order):
             mfcc_mean_, mfcc_std_, _, mfcc_mean_diff_, mfcc_std_diff_, __ = self._feature_statistics_helper_one(mfcc[:, i])
-            mfcc_diff_norm_mean_, mfcc_diff_norm_std_, mfcc_diff_norm_mean_diff_, mfcc_diff_norm_std_diff_ = self._feature_statistics_helper_two(mfcc_diff_norm[:, i])
+            # mfcc_diff_norm_mean_, mfcc_diff_norm_std_, mfcc_diff_norm_mean_diff_, mfcc_diff_norm_std_diff_ = self._feature_statistics_helper_two(mfcc_diff_norm[:, i])
 
             mfcc_mean = np.append(mfcc_mean, mfcc_mean_.reshape(-1,1), axis=-1)
             mfcc_std = np.append(mfcc_std, mfcc_std_.reshape(-1,1), axis=-1)
             mfcc_mean_diff = np.append(mfcc_mean_diff, mfcc_mean_diff_.reshape(-1,1), axis=-1)
             mfcc_std_diff = np.append(mfcc_std_diff, mfcc_std_diff_.reshape(-1,1), axis=-1)
 
-            mfcc_diff_norm_mean = np.append(mfcc_diff_norm_mean, mfcc_diff_norm_mean_.reshape(-1,1), axis=-1)
-            mfcc_diff_norm_std = np.append(mfcc_diff_norm_std, mfcc_diff_norm_std_.reshape(-1,1), axis=-1)
-            mfcc_diff_norm_mean_diff = np.append(mfcc_diff_norm_mean_diff, mfcc_diff_norm_mean_diff_.reshape(-1,1), axis=-1)
-            mfcc_diff_norm_std_diff = np.append(mfcc_diff_norm_std_diff, mfcc_diff_norm_std_diff_.reshape(-1,1), axis=-1)
+            # mfcc_diff_norm_mean = np.append(mfcc_diff_norm_mean, mfcc_diff_norm_mean_.reshape(-1,1), axis=-1)
+            # mfcc_diff_norm_std = np.append(mfcc_diff_norm_std, mfcc_diff_norm_std_.reshape(-1,1), axis=-1)
+            # mfcc_diff_norm_mean_diff = np.append(mfcc_diff_norm_mean_diff, mfcc_diff_norm_mean_diff_.reshape(-1,1), axis=-1)
+            # mfcc_diff_norm_std_diff = np.append(mfcc_diff_norm_std_diff, mfcc_diff_norm_std_diff_.reshape(-1,1), axis=-1)
 
-        return mfcc_mean, mfcc_std, mfcc_mean_diff, mfcc_std_diff, mfcc_diff_norm_mean, mfcc_diff_norm_std, mfcc_diff_norm_mean_diff, mfcc_diff_norm_std_diff
+        return mfcc_mean, mfcc_std, mfcc_mean_diff, mfcc_std_diff # , mfcc_diff_norm_mean, mfcc_diff_norm_std, mfcc_diff_norm_mean_diff, mfcc_diff_norm_std_diff
 
     def _spectrum_rolloff_statistics(self):
         """
@@ -1053,10 +1057,11 @@ class Train(builtins.object):
         ste_segmented = lrs.util.frame(ste, frame_length=self._nframes_asegment, hop_length=self._nframes_asegment_hop).transpose()
 
         # reshape the mean can be broadcast
-        ste_mean_asegment = np.mean(ste_segmented, axis=-1).reshape(-1,1)
+        ste_mean_asegment = ste_segmented.mean(axis=-1).reshape(-1,1)
 
         # this looks like more complex than we thought, because the output of np.sign function can be -1, 0 or 1.
-        LSTER = 1.0 * np.sum((np.sign(np.sign(1.0/3 * ste_mean_asegment - ste_segmented) * 2 - 1) + 1), axis=-1) / (2 * self._nframes_asegment)
+        LSTER = np.where((1.0/3 * ste_mean_asegment - ste_segmented) > 0, 1, 0).mean(axis=-1)
+        # LSTER = 1.0 * np.sum((np.sign(np.sign(1.0/3 * ste_mean_asegment - ste_segmented) * 2 - 1) + 1), axis=-1) / (2 * self._nframes_asegment)
 
         return LSTER
 
@@ -1162,9 +1167,8 @@ class Train(builtins.object):
                         except:
                             self._logger.error("Compute the feature statistics of the speech data of {} failed!".format(src))
                             continue
-                        else:
-                            self._logger.info("{}'th speech file done!".format(i))
-                            i = i + 1
+                        self._logger.info("{}'th speech file done!".format(i))
+                        i = i + 1
 
         # delete the first row
         speech_feature_statistics = np.delete(speech_feature_statistics, 0, axis=0)
@@ -1530,11 +1534,16 @@ class Train(builtins.object):
         # **************************compute separation threshold features' ranking****************************
         # ********************************************************************************************************
         self._logger.info("Computing separation threshold separation power features' ranking")
+
+        # ****************************************************************************
+        # **************** separation threshold ranking method 1 *********************
+        # ****************************************************************************
         # remaining features
         powerlist_remaining = copy.deepcopy(power_list)
 
         # ranked features
         sp_powerlist_ranking = []
+
 
         # initialize highest score and name of the feature who has the highest score for now
         highest_score = -np.inf
@@ -1576,6 +1585,27 @@ class Train(builtins.object):
                 if power_remaining.name_ == name_selected:
                     sp_powerlist_ranking.append(power_remaining)
                     powerlist_remaining.remove(power_remaining)
+        # ***************************************************************************
+        # ***************************************************************************
+
+        # ****************************************************************************
+        # **************** separation threshold ranking method 2 *********************
+        # ****************************************************************************
+        # # remaining features
+        # powerlist_remaining = copy.deepcopy(power_list)
+        # # ranked features
+        # sp_powerlist_ranking = []
+        # # feature ranking
+        # fea_ranking = SFFS.SFFS(speech, music, self._logger)
+
+        # for feature in fea_ranking:
+        #     for power in powerlist_remaining:
+        #         if power.name_ == feature:
+        #             sp_powerlist_ranking.append(power)
+        #             powerlist_remaining.remove(power)
+        #             break
+        # ***************************************************************************
+        # ***************************************************************************
         self._logger.info("Compute separation threshold separation power features' ranking done!")
 
         return es_powerlist_ranking, em_powerlist_ranking, hs_powerlist_ranking, hm_powerlist_ranking, sp_powerlist_ranking
@@ -1611,7 +1641,7 @@ class Train(builtins.object):
         self._logger.info("Start cross validation to choose features!")
         K_fold = 5
         # maximum features for each threshold
-        max_feature = 30
+        max_feature = 10
         # dict of cv score
         cv_score = {}
 
@@ -1789,15 +1819,15 @@ class Train(builtins.object):
                 return Di
 
             # cross-validation to get scores
-            for a in range(1, 6+1,1): # a is number of features used in extreme speech threshold
-                for b in range(1, 6+1,1): # b is number of features used in extreme music threshold
-                    for c in range(1, 20+1,1): # c is number of features used in high probability speech threshold
+            for a in range(1, 3+1,1): # a is number of features used in extreme speech threshold
+                for b in range(1, 3+1,1): # b is number of features used in extreme music threshold
+                    for c in range(1, 5+1,1): # c is number of features used in high probability speech threshold
                         start = time.time()
                         # initialize the max score
                         max_score = -np.inf
                         a_max, b_max, c_max, d_max, e_max = 0, 0, 0, 0, 0
-                        for d in range(1, 20+1,1): # d is number of features used in high probability music threshold
-                            for e in range(1, max_feature+1,1): # e is number of features used in separation threshold
+                        for d in range(1, 5+1,1): # d is number of features used in high probability music threshold
+                            for e in range(1, 30+1,1): # e is number of features used in separation threshold
                                 speech_test_resault = segmentation(speech_test,a,b,c,d,e)
                                 music_test_resault = segmentation(music_test,a,b,c,d,e)
                                 test_score = (np.where(speech_test_resault>0, 1, 0).sum() + np.where(music_test_resault<0, 1, 0).sum()) / (speech_test_resault.size + music_test_resault.size)
@@ -1813,7 +1843,7 @@ class Train(builtins.object):
 
                         # compute and show how long the to be done.
                         cost_one = time.time() - start
-                        cost = cost_one * (6*6*20-((a-1)*6*20+(b-1)*20+c)) * K_fold
+                        cost = cost_one * (3*3*5-((a-1)*3*5+(b-1)*10+c)) * K_fold
                         hour = int(cost/3600)
                         minute = int((cost%3600)/60)
                         self._logger.info("{} hour - {} minute to be done!".format(hour, minute))
@@ -1830,12 +1860,51 @@ class Train(builtins.object):
 
         return cv_score_sorted
 
-    def pop_system():
+    def pop_system(self):
         """
         pop system setting using zip file
         """
-        pass
+        self._logger.info("pop the system setting!")
 
+        # load cross-validation resaults
+        with open(os.path.join(self._model_files_dir, 'cv_scores_sorted'), 'rb') as f:
+            cv_scores_sorted = pickle.load(f)
+
+        # get the optimal number of features per threshold
+        n_es_features, n_em_features, n_hs_features, n_hm_features, n_sp_features = cv_scores_sorted[0][0].split('_')
+
+        setting = {
+        'frame_size' : self._config['frame_size'],
+        'frame_shift' : self._config['frame_shift'],
+        'segment_size' : self._config['segment_size'],
+        'segment_shift' : self._config['segment_shift'],
+        'operating_rate' : self._config['operating_rate'],
+        'mfcc_order' : self._config['mfcc_order'],
+        'roll_percent' : self._config['roll_percent'],
+        'n_fft' : self._config['n_fft'],
+        'n_es_features' : int(n_es_features),
+        'n_em_features' : int(n_em_features),
+        'n_hs_features' : int(n_hs_features),
+        'n_hm_features' : int(n_hm_features),
+        'n_sp_features' : int(n_sp_features),
+        }
+
+        # write setting yaml
+        with open(os.path.join(self._model_files_dir, 'setting.yaml'), 'w') as f:
+            yaml.dump(setting, f)
+
+        # zip the whole files and write it on the disk
+        with zipfile.ZipFile(os.path.join(self._model_files_dir, 'system.zip'), 'w') as myzip:
+            myzip.write(os.path.join(self._model_files_dir, 'es_powerlist_ranking'), 'es_powerlist_ranking')
+            myzip.write(os.path.join(self._model_files_dir, 'em_powerlist_ranking'), 'em_powerlist_ranking')
+            myzip.write(os.path.join(self._model_files_dir, 'hs_powerlist_ranking'), 'hs_powerlist_ranking')
+            myzip.write(os.path.join(self._model_files_dir, 'hm_powerlist_ranking'), 'hm_powerlist_ranking')
+            myzip.write(os.path.join(self._model_files_dir, 'sp_powerlist_ranking'), 'sp_powerlist_ranking')
+            myzip.write(os.path.join(self._model_files_dir, 'setting.yaml'), 'setting.yaml')
+
+        self._logger.info("pop the system setting done!")
+
+        return
 
     def _feature_statistics_helper_one(self, feature, skew=False):
         """
