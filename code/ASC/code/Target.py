@@ -10,6 +10,7 @@ import getopt
 
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 
@@ -66,7 +67,7 @@ class Test(object):
         T_min :
 
     """
-    def configure(self, system, cfg):
+    def configure(self, system):
 
         # ***************************system setting configuration******************************
         try:
@@ -166,6 +167,13 @@ class Test(object):
         self.sp_speech_positions = -1 * self.sp_music_positions
 
 
+    def _cfg_init(self, cfg):
+        """
+        this function is called when to tag batch wav files.
+
+        parameters:
+            cfg ; string, config file path
+        """
         # target config
         try:
             with open(cfg, 'r') as f:
@@ -250,6 +258,8 @@ class Test(object):
             self.config['average_period'] = 5
         if self.config.get('time_constant', None) == None:
             self.config['time_constant'] = self.config['average_period']
+
+        return
 
     def _short_time_energy(self):
         """
@@ -521,10 +531,10 @@ class Test(object):
                              between consecutive analysis points
             mfcc_std_diff : np.ndarray, shape=(n_segments, self._mfcc_order); standard deviation of the difference magnitude
                             of mfcc consecutive analysis points
-            mfcc_diff_norm_mean : np.ndarray, shape=(n_segments, self._mfcc_order)
-            mfcc_diff_norm_std : np.ndarray, shape=(n_segments, self._mfcc_order)
-            mfcc_diff_norm_mean_diff : np.ndarray, shape=(n_segments, self._mfcc_order)
-            mfcc_diff_norm_std_diff : np.ndarray, shape=(n_segments, self._mfcc_order)
+            # mfcc_diff_norm_mean : np.ndarray, shape=(n_segments, self._mfcc_order)
+            # mfcc_diff_norm_std : np.ndarray, shape=(n_segments, self._mfcc_order)
+            # mfcc_diff_norm_mean_diff : np.ndarray, shape=(n_segments, self._mfcc_order)
+            # mfcc_diff_norm_std_diff : np.ndarray, shape=(n_segments, self._mfcc_order)
         """
         # mfcc, mfcc_diff_norm = self._mfcc()
         mfcc = self._mfcc()
@@ -668,7 +678,6 @@ class Test(object):
                                                         'hber_mean', 'hber_std', 'hber_mean_diff', 'hber_std_diff',
                                                         'corr_mean', 'corr_std', 'corr_mean_diff', 'corr_std_diff',
                                                         'mfcc_mean', 'mfcc_std', 'mfcc_mean_diff', 'mfcc_std_diff',
-                                                        'mfccdn_mean', 'mfccdn_std', 'mfccdn_mean_diff', 'mfccdn_std_diff',
                                                         'rolloff_mean', 'rolloff_std', 'rolloff_mean_diff', 'rolloff_std_diff',
                                                         'centroid_mean', 'centroid_std', 'centroid_mean_diff', 'centroid_std_diff',
                                                         'flux_mean', 'flux_std', 'flux_mean_diff', 'flux_std_diff',
@@ -820,16 +829,108 @@ class Test(object):
         return Di, Ds, Db
 
 
-    def tag_single(self, **kwargs):
+    def tag_single(self, input_path, output_path, single=True):
         """
         this function can be called to tag one wav file
-        """
-        pass
 
-    def tag_batch(self):
+        parameters:
+            input_path : string, input wav file path
+            output_path : string, output label file path
+            single : bool, wether single wav tag
+        """
+
+        self.config = {}
+
+        # set smoothing parameters
+        self.config['average_period'] = 5
+        self.config['time_constant'] = self.config['average_period']
+
+        # load wav file data
+        self._data = lrs.load(input_path, sr=self._operating_rate, mono=True)
+
+        # get the concated statistics
+        feature_statistics_df = self._all_statistics_concate()
+
+        # get segment resault, Di is initial classification,
+        # Ds is smoothed classification resault, Db is the final resaults
+        Di, Ds, Db = self._segmentation(feature_statistics_df)
+
+        if output_path is None:
+            plt.figure(1)
+
+            # first polt the wav
+            plt.subplot(411)
+            plt.plot(self._data)
+            plt.title("wav curve")
+
+            # second plot the initial classification resault
+            plt.subplot(412)
+            plt.plot(Di)
+            plt.title("Initail")
+
+            # next plot the smoothed classification resault
+            plt.subplot(413)
+            plt.plot(Ds)
+            plt.title("Smoothed")
+
+            # finally plot the final binary classification resault
+            plt.subplot(414)
+            plt.plot(Db)
+            plt.title("Final Binary")
+
+            plt.show()
+        
+        else:
+            # label = [[(satrt_1, end_1), class_1,], [(start_2, end_2), class_2], ..., [(start_n, end_n), class_n]]
+            label = []
+            
+            # organize the classification resault
+            start = 0
+            for idx in range(1,Db.size):
+                if Db[idx] != Db[idx-1]:
+                    label.append([(start, idx), 'music' if Db[idx-1] == -1 else 'speech'])
+                    start = idx
+
+            label.append([(start, Db.size), 'music' if Db[-1] == -1 else 'speech'])
+
+            # this is the label content stored to disk
+            lab_content = ""
+            # compute every (start, end) tome node according to segment hop size, and append it at the end of lab_content
+            for (start, end), lab in label:
+                lab_content += "{} {} {}\n".format(start * self.setting['segment_shift'],
+                                                   end * self.setting['segment_shift'],
+                                                   lab)
+            with open(output_path, 'w') as f:
+                f.write(lab_content)
+
+        return 
+
+    def tag_batch(self, cfg):
         """
         this function can be called to tag batch wav/s
         """
+        # first to configure the cfg file
+        self._cfg_init(cfg)
+
+        # wether the label files directory is same as wav files directory
+        if self.config['labels_path'] != self.config['wav_path']:
+            for root, dirlist, filelist in os.walk(self.config['wav_path']):
+                try:
+                    os.makedirs(root.replace(self.config['wav_path'], self.config['labels_path']))
+                except:
+                    pass
+        # tag each wav file and save label file to labels files directory
+        for root, dirlist, filelist in os.walk(self.config['wav_path']):
+            for filename in filelist:
+                if filename.split('.')[-1] == 'wav':
+                    basename = filename.split('.')[0]
+
+
+        return
+
+
+
+
         
 
 
@@ -864,24 +965,72 @@ class Test(object):
             return resault
 
 def main(argv):
-    try:
-        opts, args = getopt.getopt(argv, 'hc:s:',['help', 'config=', 'sys='])
-    except getopt.GetoptError as e:
-        print('python Target.py -s <system setting file path> -c <config file path>')
 
+    usage = """
+This script is to tag music/speech label
+            
+case 1, single wav tagging without no file output:
+                
+    python3 Target.py -s <system setting file path> -i <wav file path>
+            
+case 2, single wav tagging with ouputing a label file:
+                
+    python3 Target.py -s <system setting file path> -i <wav file path> -o <label file path>
+            
+case 3, batch wav tagging with outputting label files:
+                
+    python3 Target.py -s <system setting file path> -c <config file path>
+
+arguments:
+
+    -s  --sys :      system setting file path; the file must be created by Learn.py script.
+
+    -c  --cfg :      config file path; only used when tagging a batch of music files
+
+    -i  --input :    input music file path; only used when tag a single wav file
+
+    -o  --output :   output label file path(optional); only used when tag a single wav file
+            """
+
+    # define the parameters 
+    system_path = None
+    cfg_path = None
+    input_path = None
+    output_path = None
+
+
+    try:
+        opts, args = getopt.getopt(argv, 'hs:c:i:o:',['help', 'sys=', 'cfg=', 'input=', 'output= '])
+    except:
+        print(usage)
+
+    # get arguments' value
     for opt, value in opts:
         if opt in ['-h', '--help']:
-            print('python Target.py -s <system setting file path> -c <config file path>')
+            print(usage)
         elif opt in ['-s', '--sys']:
-            system = value
-        elif opt in ['-c', '--config']:
-            cfg = value
-    try:
-        Test(system, cfg)
-    except UnboundLocalError as e:
-        print('python Target.py -s <system setting file path> -c <config file path>')
-    except Exception as e:
-        raise(e)
+            system_path = value
+        elif opt in ['-c', '--cfg']:
+            cfg_path = value
+        elif opt in ['-i', '--input']:
+            input_path = value
+        elif opt in ['-o', '--output']:
+            output_path = value
+
+    # judge wether to tag single wav file or tag batch wav files
+    if system_path is None:
+        print(usage)
+        return
+    else:
+        if input_path and cfg_path is None:
+            Test(system_path).tag_single(input_path, output_path)
+            return
+        elif cfg_path and input_path is None and output_path is None:
+            Test(system_path).tag_batch(cfg)
+            return
+        else:
+            print(usage)
+            return
 
 if __name__ == '__main__':
     main(sys.argv[1:])
