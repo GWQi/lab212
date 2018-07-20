@@ -5,3 +5,5 @@ project:
   1. crawler. crawl wav files from website.
   
   2. ASR. Audio scene recognization.
+
+  3. SED. poly-Sound events dection
