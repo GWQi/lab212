@@ -2,8 +2,26 @@ This directory is used to store project codes.
 
 project:
   
-  1. crawler. crawl wav files from website.
-  
-  2. ASR. Audio scene recognization.
+  1.Crawler. crawl wav files from website.
+    
+    Crawler Dependency packages:
+      python3
+      scrapy
 
-  3. SED. poly-Sound events dection
+  2.ASR. Audio scene recognization.
+
+    ASC Dependency packages:
+      python3
+      librose
+      python3-tk
+      scipy
+      pandas
+      numpy
+      sklearn
+      pickle
+      yaml
+      
+  3.SED. poly-Sound events dection
+
+    SED Dependency packages:
+      None
