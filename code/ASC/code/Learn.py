@@ -21,7 +21,6 @@ import yaml
 
 from tools.readlabel import readlabel
 from Config import Config
-from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import ShuffleSplit
 from scipy import stats
 
