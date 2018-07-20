@@ -26,7 +26,7 @@ class FeaParam(object):
     # weather use mfcc
     self.mfcc_on_ = True
     # mfcc order if use mfcc
-    self.mfcc_order_ = 
+    self.mfcc_order_ = 40
 
 
   def Configure_(self, )
