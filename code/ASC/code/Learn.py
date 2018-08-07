@@ -21,7 +21,6 @@ import yaml
 
 from tools.readlabel import readlabel
 from Config import Config
-from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import ShuffleSplit
 from scipy import stats
 
@@ -502,11 +501,11 @@ class Train(builtins.object):
                                                'lster'])
 
 
-        # if not self._with_statistics in ['True', 'true']:
-        #     self._write_all_statistics()
+        if not self._with_statistics in ['True', 'true']:
+            self._write_all_statistics()
         
-        # self._write_feature_ranking()
-        # self._write_cross_validation()
+        self._write_feature_ranking()
+        self._write_cross_validation()
         self.pop_system()
 
 

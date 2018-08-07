@@ -8,8 +8,11 @@ import logging
 import sys
 import getopt
 
+import librosa as lrs
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import scipy.fftpack as fft
 
 
 
@@ -66,29 +69,29 @@ class Test(object):
         T_min :
 
     """
-    def configure(self, system, cfg):
+    def __init__(self, system):
 
         # ***************************system setting configuration******************************
         try:
             with zipfile.ZipFile(system) as myzip:
                 # load extrem speech threshold separation power ranking list
-                with myzip.open('es_ranking_list', 'r') as f:
+                with myzip.open('es_powerlist_ranking', 'r') as f:
                     self.es_ranking_list = pickle.load(f)
 
                 # load extrem music threshold separation power ranking list
-                with myzip.open('em_ranking_list', 'r') as f:
+                with myzip.open('em_powerlist_ranking', 'r') as f:
                     self.em_ranking_list = pickle.load(f)
 
                 # load high probability speech threshold separation power ranking list
-                with myzip.open('hs_ranking_list', 'r') as f:
+                with myzip.open('hs_powerlist_ranking', 'r') as f:
                     self.hs_ranking_list = pickle.load(f)
 
                 # load high probability music threshold separation power ranking list
-                with myzip.open('hm_ranking_list', 'r') as f:
+                with myzip.open('hm_powerlist_ranking', 'r') as f:
                     self.hm_ranking_list = pickle.load(f)
 
                 # load speech, music separation threshold separation power ranking list
-                with myzip.open('sp_ranking_list', 'r') as f:
+                with myzip.open('sp_powerlist_ranking', 'r') as f:
                     self.sp_ranking_list = pickle.load(f)
 
                 # load system setting dict
@@ -103,6 +106,8 @@ class Test(object):
         self._frame_hop_length = int(self.setting['operating_rate'] * self.setting['frame_shift'])
         self._segment_length = int(self.setting['operating_rate'] * self.setting['segment_size'])
         self._segment_hop_length = int(self.setting['operating_rate'] * self.setting['segment_shift'])
+        self._nframes_asegment = int(1 + (self._segment_length - self._frame_length) / self._frame_hop_length)
+        self._nframes_asegment_hop = int(1 + (self._segment_hop_length - self._frame_length) / self._frame_hop_length)
         self._n_fft = self.setting['n_fft']
         self._mfcc_order = self.setting['mfcc_order']
         self._roll_percent = self.setting['roll_percent']
@@ -143,7 +148,7 @@ class Test(object):
         self.em_features = [power.name_ for power in self.em_ranking_list[0:self.setting['n_em_features']]]
         # self.em_thresholds_left = np.array([power.extreme_music_left_ for power in self.em_ranking_list[0:self.setting['n_em_features']]])
         # self.em_thresholds_right = np.array([power.extreme_music_right_ for power in self.em_ranking_list[0:self.setting['n_em_features']]])
-        self.em_thresholds = [power.exteme_music_ for power in self.em_ranking_list[0:self.setting['n_em_features']]]
+        self.em_thresholds = [power.extreme_music_ for power in self.em_ranking_list[0:self.setting['n_em_features']]]
         self.em_positions = [-1 if power._music_position == 'left' else 1 for power in self.em_ranking_list[0:self.setting['n_em_features']]]
 
         # the best n features for high probibality speech threshold and its corresponding high propability speech threshold,
@@ -155,8 +160,8 @@ class Test(object):
         # the best n features for high probibality music threshold and its corresponding high propability music threshold
         # speech/music position, -1 indicate 'left', 1 indicate right
         self.hm_features = [power.name_ for power in self.hm_ranking_list[0:self.setting['n_hm_features']]]
-        self.hm_thresholds = np.array([power.hm_threshold_ for power in self.hm_ranking_list[0:self.setting['n_hm_features']]])
-        self.hm_positions = np.array([-1 if power._music_position == 'left' else 1 for power in self.hm_ranking_list[0:selt.setting['n_hm_features']]])
+        self.hm_thresholds = np.array([power.high_music_ for power in self.hm_ranking_list[0:self.setting['n_hm_features']]])
+        self.hm_positions = np.array([-1 if power._music_position == 'left' else 1 for power in self.hm_ranking_list[0:self.setting['n_hm_features']]])
 
         # the best n features for separation threshold and its corresponding separation threshold
         # speech/music position, -1 indicate 'left', 1 indicate right
@@ -166,6 +171,13 @@ class Test(object):
         self.sp_speech_positions = -1 * self.sp_music_positions
 
 
+    def _cfg_init(self, cfg):
+        """
+        this function is called when to tag batch wav files.
+
+        parameters:
+            cfg ; string, config file path
+        """
         # target config
         try:
             with open(cfg, 'r') as f:
@@ -250,6 +262,8 @@ class Test(object):
             self.config['average_period'] = 5
         if self.config.get('time_constant', None) == None:
             self.config['time_constant'] = self.config['average_period']
+
+        return
 
     def _short_time_energy(self):
         """
@@ -521,10 +535,10 @@ class Test(object):
                              between consecutive analysis points
             mfcc_std_diff : np.ndarray, shape=(n_segments, self._mfcc_order); standard deviation of the difference magnitude
                             of mfcc consecutive analysis points
-            mfcc_diff_norm_mean : np.ndarray, shape=(n_segments, self._mfcc_order)
-            mfcc_diff_norm_std : np.ndarray, shape=(n_segments, self._mfcc_order)
-            mfcc_diff_norm_mean_diff : np.ndarray, shape=(n_segments, self._mfcc_order)
-            mfcc_diff_norm_std_diff : np.ndarray, shape=(n_segments, self._mfcc_order)
+            # mfcc_diff_norm_mean : np.ndarray, shape=(n_segments, self._mfcc_order)
+            # mfcc_diff_norm_std : np.ndarray, shape=(n_segments, self._mfcc_order)
+            # mfcc_diff_norm_mean_diff : np.ndarray, shape=(n_segments, self._mfcc_order)
+            # mfcc_diff_norm_std_diff : np.ndarray, shape=(n_segments, self._mfcc_order)
         """
         # mfcc, mfcc_diff_norm = self._mfcc()
         mfcc = self._mfcc()
@@ -668,7 +682,6 @@ class Test(object):
                                                         'hber_mean', 'hber_std', 'hber_mean_diff', 'hber_std_diff',
                                                         'corr_mean', 'corr_std', 'corr_mean_diff', 'corr_std_diff',
                                                         'mfcc_mean', 'mfcc_std', 'mfcc_mean_diff', 'mfcc_std_diff',
-                                                        'mfccdn_mean', 'mfccdn_std', 'mfccdn_mean_diff', 'mfccdn_std_diff',
                                                         'rolloff_mean', 'rolloff_std', 'rolloff_mean_diff', 'rolloff_std_diff',
                                                         'centroid_mean', 'centroid_std', 'centroid_mean_diff', 'centroid_std_diff',
                                                         'flux_mean', 'flux_std', 'flux_mean_diff', 'flux_std_diff',
@@ -734,6 +747,144 @@ class Test(object):
 
         return feature_statistics_df
 
+    def _feature_statistics_helper_one(self, feature, skew=False):
+        """
+        help compute the statistical parameters of one feature.
+        
+        parameters:
+            feature : np.ndarray, shape=(n_frames,); one kind of feature for each framed audio
+            skew : bool; if true, compute the skewness of feature and skewness of the difference between
+                   consecutive analysis frames; default is False
+
+        returns:
+            mean : np.ndarray, shape=(n_segments,); mean value of the feature across the segment
+            std : np.ndarray, shape=(n_segments,); standard deviation of the feature across the segment
+            skewness : np.ndarray, shape=(n_segments,); skewness of the feature in one segment
+            mean_diff : np.ndarray, shape=(n_segments,); mean value of the difference magnitude between
+                        consecutive analysis points
+            std_diff : np.ndarray, shape=(n_segments,); standard deviation of the difference magnitude
+                       between consecutive analysis points
+            skewness_diff : skewness of the difference between consecutive analysis frames
+        
+        notes:
+            this function is only used to help compute ste, zcr, low(high) band energy ratio,
+            autocorrelation coefficients, mfcc(not mfcc diff norm), spectrum roll-off, spect-
+            rum centroid and spectum spread statistical parameters. The statistical parameters
+            of mfcc diff norm and spectral flux can not use this function to compute.
+            Please use helper two.
+        """
+        skewness = None
+        skewness_diff = None
+
+        feature_segmented = lrs.util.frame(feature, frame_length=self._nframes_asegment, hop_length=self._nframes_asegment_hop).transpose()
+
+        mean = np.mean(feature_segmented, axis=-1)
+
+        std = np.std(feature_segmented, axis=-1)
+
+        feature_diff = feature[1:] - feature[0:-1]
+
+        feature_diff_segmented = lrs.util.frame(feature_diff, frame_length=self._nframes_asegment-1, hop_length=self._nframes_asegment_hop).transpose()
+
+        mean_diff = np.mean(feature_diff_segmented, axis=-1)
+
+        std_diff = np.std(feature_diff_segmented, axis=-1)
+
+        if skew:
+            skewness = np.mean((feature_segmented-mean.reshape(-1,1))**3, axis=-1) / (std**3+0.0000001)
+            skewness_diff = np.mean((feature_diff_segmented-mean_diff.reshape(-1,1))**3, axis=-1) / (std_diff**3 + 0.0000001)
+
+        return mean, std, skewness, mean_diff, std_diff, skewness_diff
+
+    def _feature_statistics_helper_two(self, feature):
+        """
+        help compute the statistical parameters of features: mfcc diff norm, spectral flux
+        
+        parameters:
+            feature : np.ndarray, shape=(n_frames-1,)
+
+        returns:
+            mean : np.ndarray, shape=(n_segments,); mean value of the feature across the segment
+            std : np.ndarray, shape=(n_segments,); standard deviation of the feature across the segment
+            mean_diff : np.ndarray, shape=(n_segments,); mean value of the difference magnitude between
+                        consecutive analysis points
+            std_diff : np.ndarray, shape=(n_segments,); standard deviation of the difference magnitude
+                       between consecutive analysis points
+
+        notes:
+            this function is only used to help compute mfcc diff norm, spectral flux statistical parameters.
+            See helper one.
+        """
+
+        feature_segmented = lrs.util.frame(feature, frame_length=self._nframes_asegment-1, hop_length=self._nframes_asegment_hop).transpose()
+
+        mean = np.mean(feature_segmented, axis=-1)
+
+        std = np.std(feature_segmented, axis=-1)
+
+        feature_diff = feature[1:] - feature[0:-1]
+
+        feature_diff_segmented = lrs.util.frame(feature_diff, frame_length=self._nframes_asegment-2, hop_length=self._nframes_asegment_hop).transpose()
+
+        mean_diff = np.mean(feature_diff_segmented, axis=-1)
+
+        std_diff = np.std(feature_diff_segmented, axis=-1)
+
+        return mean, std, mean_diff, std_diff
+
+    def _stft(self):
+        """
+        Short-time Fourier transform (STFT)
+
+        Returns a real matrix stft_matrix such that
+            stft_matrix[t, f] is the magnitude of frequency bin `f`
+            at frame `t`
+
+            stft_matrix[t, f] is the phase of frequency bin `f`
+            at frame `t`
+
+        Returns
+        -------
+        stft_matrix : np.ndarray [shape=(t, 1 + n_fft/2), dtype=np.float64?]
+        """
+
+        fft_window = lrs.filters.get_window('hann', self._n_fft, fftbins=True)
+
+        # Reshape so that the window can be broadcast
+        fft_window = fft_window.reshape((-1, 1))
+
+        # Window the time series.
+        y_frames = lrs.util.frame(self._data, frame_length=self._frame_length, hop_length=self._frame_hop_length)
+
+        # pad the framed data out to n_fft size
+        y_frames = lrs.util.pad_center(y_frames, self._n_fft, axis=0)
+
+        # Pre-allocate the STFT matrix
+        stft_matrix = np.empty((int(1 + self._n_fft // 2), y_frames.shape[1]),
+                               dtype=np.complex64,
+                               order='F')
+
+        # how many columns can we fit within MAX_MEM_BLOCK?
+        n_columns = int(lrs.util.MAX_MEM_BLOCK / (stft_matrix.shape[0] *
+                                              stft_matrix.itemsize))
+
+        for bl_s in range(0, stft_matrix.shape[1], n_columns):
+            bl_t = min(bl_s + n_columns, stft_matrix.shape[1])
+
+            # `np.abs(stft_matrix[f, t])` is the magnitude of frequency bin `f`
+            # at frame `t`
+
+            # `np.angle(stft_matrix[f, t])` is the phase of frequency bin `f`
+            # at frame `t`
+            # RFFT and Conjugate here to match phase from DPWE code
+            stft_matrix[:, bl_s:bl_t] = fft.fft(fft_window *
+                                                y_frames[:, bl_s:bl_t],
+                                                axis=0)[:stft_matrix.shape[0]]
+
+        # get the magnitude of the fft matrix and transpose it to make axis=0 to indicate frame index.
+        stft_matrix = np.abs(stft_matrix.transpose())
+
+        return stft_matrix
 
     def _segmentation(self, feature_statistics_df):
         """
@@ -820,16 +971,108 @@ class Test(object):
         return Di, Ds, Db
 
 
-    def tag_single(self, **kwargs):
+    def tag_single(self, input_path, output_path, single=True):
         """
         this function can be called to tag one wav file
-        """
-        pass
 
-    def tag_batch(self):
+        parameters:
+            input_path : string, input wav file path
+            output_path : string, output label file path
+            single : bool, wether single wav tag
+        """
+
+        self.config = {}
+
+        # set smoothing parameters
+        self.config['average_period'] = 5
+        self.config['time_constant'] = self.config['average_period']
+
+        # load wav file data
+        self._data, _ = lrs.load(input_path, sr=self._operating_rate, mono=True)
+
+        # get the concated statistics
+        feature_statistics_df = self._all_statistics_concate()
+
+        # get segment resault, Di is initial classification,
+        # Ds is smoothed classification resault, Db is the final resaults
+        Di, Ds, Db = self._segmentation(feature_statistics_df)
+
+        if output_path is None:
+            plt.figure(1)
+
+            # first polt the wav
+            plt.subplot(411)
+            plt.plot(self._data)
+            plt.title("wav curve")
+
+            # second plot the initial classification resault
+            plt.subplot(412)
+            plt.plot(Di)
+            plt.title("Initail")
+
+            # next plot the smoothed classification resault
+            plt.subplot(413)
+            plt.plot(Ds)
+            plt.title("Smoothed")
+
+            # finally plot the final binary classification resault
+            plt.subplot(414)
+            plt.plot(Db)
+            plt.title("Final Binary")
+
+            plt.show()
+        
+        else:
+            # label = [[(satrt_1, end_1), class_1,], [(start_2, end_2), class_2], ..., [(start_n, end_n), class_n]]
+            label = []
+            
+            # organize the classification resault
+            start = 0
+            for idx in range(1,Db.size):
+                if Db[idx] != Db[idx-1]:
+                    label.append([(start, idx), 'music' if Db[idx-1] == -1 else 'speech'])
+                    start = idx
+
+            label.append([(start, Db.size), 'music' if Db[-1] == -1 else 'speech'])
+
+            # this is the label content stored to disk
+            lab_content = ""
+            # compute every (start, end) tome node according to segment hop size, and append it at the end of lab_content
+            for (start, end), lab in label:
+                lab_content += "{} {} {}\n".format(start * self.setting['segment_shift'],
+                                                   end * self.setting['segment_shift'],
+                                                   lab)
+            with open(output_path, 'w') as f:
+                f.write(lab_content)
+
+        return 
+
+    def tag_batch(self, cfg):
         """
         this function can be called to tag batch wav/s
         """
+        # first to configure the cfg file
+        self._cfg_init(cfg)
+
+        # wether the label files directory is same as wav files directory
+        if self.config['labels_path'] != self.config['wav_path']:
+            for root, dirlist, filelist in os.walk(self.config['wav_path']):
+                try:
+                    os.makedirs(root.replace(self.config['wav_path'], self.config['labels_path']))
+                except:
+                    pass
+        # tag each wav file and save label file to labels files directory
+        for root, dirlist, filelist in os.walk(self.config['wav_path']):
+            for filename in filelist:
+                if filename.split('.')[-1] == 'wav':
+                    basename = filename.split('.')[0]
+
+
+        return
+
+
+
+
         
 
 
@@ -864,24 +1107,74 @@ class Test(object):
             return resault
 
 def main(argv):
-    try:
-        opts, args = getopt.getopt(argv, 'hc:s:',['help', 'config=', 'sys='])
-    except getopt.GetoptError as e:
-        print('python Target.py -s <system setting file path> -c <config file path>')
 
+    usage = """
+This script is to tag music/speech label
+            
+case 1, single wav tagging without no file output:
+                
+    python3 Target.py -s <system setting file path> -i <wav file path>
+            
+case 2, single wav tagging with ouputing a label file:
+                
+    python3 Target.py -s <system setting file path> -i <wav file path> -o <label file path>
+            
+case 3, batch wav tagging with outputting label files:
+                
+    python3 Target.py -s <system setting file path> -c <config file path>
+
+arguments:
+
+    -s  --sys :      system setting file path; the file must be created by Learn.py script.
+
+    -c  --cfg :      config file path; only used when tagging a batch of music files
+
+    -i  --input :    input music file path; only used when tag a single wav file
+
+    -o  --output :   output label file path(optional); only used when tag a single wav file
+            """
+
+    # define the parameters 
+
+    #default system setting path
+    system_path = '/home/guwenqi/Documents/ASC/new_model/system.zip'
+    cfg_path = None
+    input_path = None
+    output_path = None
+
+
+    try:
+        opts, args = getopt.getopt(argv, 'hs:c:i:o:',['help', 'sys=', 'cfg=', 'input=', 'output= '])
+    except:
+        print(usage)
+
+    # get arguments' value
     for opt, value in opts:
         if opt in ['-h', '--help']:
-            print('python Target.py -s <system setting file path> -c <config file path>')
+            print(usage)
         elif opt in ['-s', '--sys']:
-            system = value
-        elif opt in ['-c', '--config']:
-            cfg = value
-    try:
-        Test(system, cfg)
-    except UnboundLocalError as e:
-        print('python Target.py -s <system setting file path> -c <config file path>')
-    except Exception as e:
-        raise(e)
+            system_path = value
+        elif opt in ['-c', '--cfg']:
+            cfg_path = value
+        elif opt in ['-i', '--input']:
+            input_path = value
+        elif opt in ['-o', '--output']:
+            output_path = value
+
+    # judge wether to tag single wav file or tag batch wav files
+    if system_path is None:
+        print(usage)
+        return
+    else:
+        if input_path and cfg_path is None:
+            Test(system_path).tag_single(input_path, output_path)
+            return
+        elif cfg_path and input_path is None and output_path is None:
+            Test(system_path).tag_batch(cfg)
+            return
+        else:
+            print(usage)
+            return
 
 if __name__ == '__main__':
     main(sys.argv[1:])

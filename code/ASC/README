@@ -1,1 +1,9 @@
-1. I have changed the source code of librosa at core.stft() function, changed the deafault value of center into False.
+Modifications:
+    
+  1. I have changed the source code of librosa at core.stft() function, changed the deafault value of center into False.
+
+Structure:
+  ./cfg      some configuration files used by Learn.py and Target.py
+  ./code     source code, for details and usage you should look into __main__ function in files
+  ./log      log files directory
+  ./model    where the model files stored
