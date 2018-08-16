@@ -20,12 +20,14 @@ class FeaParams(object):
     # default frame shift length, in second
     self.frame_shift = 0.02
     # default segment length, in second
-    self.segment_length = 1
+    self.sequence_length = 100
     # default segment shift length, in second
-    self.segment_shift = 0.5
+    self.sequence_shift = 25
     # default system sample rate, if the initial rate of wav file not 
     # equal to it, down/up-sample will be done during processing
     self.rate = 44100
+    # weather mono wav
+    self.mono = True
     # weather use mfcc
     self.mfcc_on = True
     # weather use mel band energy
@@ -33,7 +35,7 @@ class FeaParams(object):
     # mfcc order if use mfcc
     self.mfcc_order = 40
     # weather use delta mfcc
-    self.mfcc_deta = True
+    self.mfcc_deta = False
 
 
   def Configure_dict(self, cfg):
@@ -106,13 +108,17 @@ class DataPrep(object):
                                               -...
                                           -data/
                                               -a001/
-                                                  -0001.dt
-                                                  -0002.dt
-                                                  -...
+                                                  -a001.dt
+                                                  -segmented/
+                                                      -0001.dt
+                                                      -0002.dt
+                                                      -...
                                               -a002/
-                                                  -0001.dt
-                                                  -0002.dt
-                                                  -...
+                                                  -a002.dt
+                                                  -segmented/
+                                                      -0001.dt
+                                                      -0002.dt
+                                                      -...
                                           -evaluation_setup/
                                               -evaluation.yaml
                                           -meta/
@@ -149,16 +155,32 @@ class DataPrep(object):
 
 
 class DcaseTrainParam(object):
-    """
-    dcase dataset training parameters
-    """
+  """
+  dcase dataset training parameters
+  """
 
-    def __init__(self):
-        """
-        training parameters defination and initialization
-        """
-        # batch size
-        
+  def __init__(self):
+    """
+    training parameters defination and initialization
+    """
+    # batch size
+    self.batch_size = 50
+    # K-fold
+    self.Kfold = 5
+    # k'th fold and i'th batch used to checkout
+    self.ith_batch = 0
+    self.kth_fold = 0
+
+    # number of epoch, when cross-validation is finished , use all train data to train final model
+    # this paramter will be used then
+    # flag indicates that weather begin to train the final model
+    self.final_train = 0
+    self.num_epoch = 5
+    # used to checkout
+    self.kth_epoch = 0
+    # 
+    
+
       
 
 
