@@ -227,6 +227,11 @@ class DCASEData2017Task2(object):
       self.ith_batch = 0
       return None, None
     # fetch i'th batch training data in k'th fold
-    x = np.empty((self.tparam.batch_size))
-    
+    x, y = [], []
+    for filepath in self.tparam.cv_setup[self.tparam.kth_fold]["train_files"][(self.tparam.ith_batch-1)*self.tparam.batch_size : self.tparam.ith_batch*self.tparam.batch_size]:
+      data = np.load(os.path.join(self.rootpath, filepath))
+      x.append(data[len(Dcase2017Task3Label):, :])
+      y.append(data[0:len(Dcase2017Task3Label), :])
+    x = np.stack(x)
+    y = np.stack(y)
     return x, y

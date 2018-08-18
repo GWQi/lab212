@@ -164,10 +164,10 @@ class DcaseTrainParam(object):
     params:
       rootpath : str, dataset directory rootpath
     """
-    if len(cv_setup) != 0:
+    if len(self.cv_setup) != 0:
       return
     # load cross-validation files partion
-    with open(os.path.join(self.root_path, "development/evaluation_setup/evaluation.yaml"), 'r') as f:
+    with open(os.path.join(rootpath, "development/evaluation_setup/evaluation.yaml"), 'r') as f:
       self.cv_setup = yaml.load(f)
 
     self.KFold = len(self.cv_setup)
