@@ -5,6 +5,8 @@
 import yaml
 import os
 
+from random import shuffle
+
 class FeaParams(object):
   """
   this class define the parameters when extract features from wav file
@@ -32,6 +34,7 @@ class FeaParams(object):
     self.mfcc_on = True
     # weather use mel band energy
     self.mbe_on = False
+    self.mbe_num = 40
     # mfcc order if use mfcc
     self.mfcc_order = 40
     # weather use delta mfcc
@@ -89,71 +92,6 @@ class FeaParams(object):
 
     return
 
-class DataPrep(object):
-  """
-  dataset preproration
-  """
-
-  def __init__(self, dirpath):
-    """
-    training parameters defination and initialization
-
-    params:
-      dirpath : string, dataset directory path, dcase dataset directory structure must satify:
-                                  -root/
-                                      -development/
-                                          -audio/
-                                              -a001.wav
-                                              -a002.wav
-                                              -...
-                                          -data/
-                                              -a001/
-                                                  -a001.npy
-                                                  -segmented/
-                                                      -0001.npy
-                                                      -0002.npy
-                                                      -...
-                                              -a002/
-                                                  -a002.npy
-                                                  -segmented/
-                                                      -0001.npy
-                                                      -0002.npy
-                                                      -...
-                                          -evaluation_setup/
-                                              -evaluation.yaml
-                                          -meta/
-                                              -a001.ann
-                                              -a002.ann
-                                              -...
-                                      -evaluation/
-                                          -audio/
-                                              -b001.wav
-                                              -b002.wav
-                                              -...
-                                          -meta/
-                                              -b001.ann
-                                              -b002.ann
-                                              -...
-    """
-    # dataset directory path
-    self.root_path = dirpath
-    # i'th fold cross-validation, 0 indicates that training not start
-    self.ith_fold = 0
-    # cross validation setup, 
-    # self.cv_setup = {1 : {"train" : ["a001.wav", "a002.wav", ...], "test" : ["b001.wav", "b002.wav"]}, 2 : {...}, ...}
-    with open(os.path.join(self.root_path, "development/evaluation_setup/evaluation.yaml"), 'r') as f:
-      self.cv_setup = yaml.load(f)
-    # K-fold
-    self.Kfold = len(self.cv_setup)
-    # configure cross validation training files
-    for i in range(1,self.Kfold+1):
-      self.cv_setup[i]["train_files"] = []
-      for train_wav in self.cv_setup[i]["train"]:
-        base_name = train_wav.split('.')[0]
-        for filename in os.listdir(os.path.join(self.root_path, "development/data/{}/".format(base_name))):
-          self.cv_setup[i]["train_files"].append(os.path.join(self.root_path, "development/data/{}/{}".format(base_name, filename)))
-
-
 class DcaseTrainParam(object):
   """
   dcase dataset training parameters
@@ -164,12 +102,12 @@ class DcaseTrainParam(object):
     training parameters defination and initialization
     """
     # batch size
-    self.batch_size_ = 50
+    self.batch_size = 50
     # K-fold
-    self.Kfold_ = 5
+    self.KFold = 5
     # k'th fold and i'th batch used to checkout
     self.ith_batch = 0
-    self.kth_fold = 0
+    self.kth_fold = 1
 
     # number of epoch, when cross-validation is finished , use all train data to train final model
     # this paramter will be used then
@@ -207,11 +145,13 @@ class DcaseTrainParam(object):
     params:
       size : int, new batch size  
     """
-    self.batch_size_ = size
+    self.batch_size = size
 
-  def checkPoint(self):
+  def saveCheckPoint(self, filepath):
     """
     this function is used to save self to disk
+    param:
+      filepath : string, path to save checkpoint
     """
 
     # set saved_check True
@@ -230,14 +170,23 @@ class DcaseTrainParam(object):
     with open(os.path.join(self.root_path, "development/evaluation_setup/evaluation.yaml"), 'r') as f:
       self.cv_setup = yaml.load(f)
 
-    self.Kfold_ = len(self.cv_setup)
+    self.KFold = len(self.cv_setup)
     # configure cross validation train_files/test_files
-    for i in range(1, self.Kfold_+1):
-      self.
+    for i in range(1, self.KFold+1):
+      # configure train_files
+      self.cv_setup[i]["train_files"] = []
+      for wav_file in self.cv_setup[i]["train"]:
+        basename = wav_file.split('.')[0]
+        for cut_file in os.listdir(os.path.join(rootpath, "development/data/{}/segmented/".format(basename))):
+          self.cv_setup[i]["train_files"].append("development/data/{}/segmented/{}".format(basename, cut_file))
+      # shuffle the train files order
+      shuffle(self.cv_setup[i]["train_files"])
 
+      # configure test_files
+      self.cv_setup[i]["test_files"] = []
+      for wav_file in self.cv_setup[i]["test"]:
+        basename = wav_file.split('.')[0]
+        for cut_file in os.listdir(os.path.join(rootpath, "development/data/{}/segmented/".format(basename))):
+          self.cv_setup[i]["train_files"].append("development/data/{}/segmented/{}".format(basename, cut_file))
 
-      
-
-
-
-    
+    return
