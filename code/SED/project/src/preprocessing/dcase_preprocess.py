@@ -235,3 +235,36 @@ class DCASEData2017Task2(object):
     x = np.stack(x)
     y = np.stack(y)
     return x, y
+
+  def dump(self, path):
+    """
+    dump self to path 
+    params:
+      path : string, path where to save self
+    """
+    with open(path, 'wb') as f:
+      pickle.dump(self, f)
+    return
+
+  def load(self, path):
+    """
+    load DCASEData2017Task2 instance from path
+    params:
+      path : string, path where to load
+    """
+    try:
+      with open(path, 'rb') as f:
+        tmp = pickle.load(path)
+        # feature extracting params
+        self.feaparams = tmp.feaparams
+        # training parameters
+        self.tparam = tmp.tparam
+        # 
+        self.rootpath = tmp.rootpath
+
+        # normalization constant
+        self.mean = tmp.mean
+        self.std = tmp.std
+    except IOError:
+      
+    return
