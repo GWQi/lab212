@@ -4,6 +4,11 @@ import sys
 import tensorflow as tf
 import numpy as np
 
+# get the lab212 code root path and append it to sys.path
+CODEROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+sys.path.append(CODEROOT)
+
+
 
 def create_flags():
   """
@@ -20,4 +25,5 @@ def create_flags():
   # ****************
   tf.app.flags.DEFINE_boolean("train",                           True,                "weather to train the network")
   tf.app.flags.DEFINE_boolean("test",                            True,                "weather to test the network")
+
   

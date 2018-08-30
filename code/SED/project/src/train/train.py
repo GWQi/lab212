@@ -5,14 +5,14 @@ import tensorflow as tf
 import sys
 import os
 
-# get the main project path and append it to sys.path
-CODE_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
-sys.path.append(CODE_PATH)
+# get the lab212 code root path and append it to sys.path
+CODEROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+sys.path.append(CODEROOT)
 
 from SED.project.src.preprocessing.dcase_preprocess import DCASEData2017Task2
 
 # this directory used to save model and tf.checkpoint
-MODEL_DIR = os.path.join(CODE_PATH, 'SED/project/model')
+MODEL_DIR = os.path.join(CODEROOT, 'SED/project/model')
 
 DCASEData2017Task2 source
 source.load(os.path.join(MODEL_DIR, 'DCASEData2017Task2.ckp'))
