@@ -92,3 +92,15 @@ def vad(filepath, labelpath, lab):
 
   return
 
+def main(wavroot, labelroot, label):
+  # batch wav file vad. wavroot, labelroot must absolute path, label is the label to tag non-silence
+  for root, dirlist, filelist in os.walk(wavroot):
+    for filename in filelist:
+      if filename.endswith('.wav'):
+        dirname = root.replace(wavroot, labelroot)
+        try:
+          os.makedirs(dirname)
+        except:
+          pass
+        basename = filename.split('.')[0]
+        vad(os.path.join(root, filename), os.path.join(dirname, basename+'.lab'), label)

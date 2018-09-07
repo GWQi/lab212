@@ -49,6 +49,14 @@ class DataIterator(ABCMeta):
   @abstractmethod
   def save(self, path):
     """
-    
+    save this data iterator to disk
     """
+    pass
+
+  @abstractmethod
+  def load(self, path):
+    """
+    load existed data iterotor
+    """
+    pass
 
