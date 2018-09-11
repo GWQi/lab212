@@ -31,9 +31,9 @@ class FeaParams(object):
     # weather mono wav
     self.mono = True
     # weather use mfcc
-    self.mfcc_on = True
+    self.mfcc_on = False
     # weather use mel band energy
-    self.mbe_on = False
+    self.mbe_on = True
     self.mbe_num = 40
     # mfcc order if use mfcc
     self.mfcc_order = 40
