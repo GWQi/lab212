@@ -12,7 +12,7 @@
 # **********************************************
 
 # mbe order
-MBE_ORDER = 64
+MBE_ORDER = 32
 # frame length in second
 MBE_FRAME_LENGTH = 0.04
 # frame shift in second

@@ -7,6 +7,7 @@
 # Description: music/speech data preprocession, this file just be excuted once to for data oreoaration
 # *************************************************
 
+import gc
 import os
 import sys
 
@@ -68,21 +69,25 @@ def main(musicroot, speechroot, fearoot):
         except:
           pass
         signal = load(filepath, labelpath, 'music', fparam.MBE_SAMPLE_RATE)
-        # log_mbe.shape=[mbe_order, T_frames]
-        log_mbe = lrs.power_to_db(lrs.feature.melspectrogram(
+        if signal is None:
+          continue
+        else:
+
+          # log_mbe.shape=[mbe_order, T_frames]
+          log_mbe = lrs.power_to_db(lrs.feature.melspectrogram(
                                   y=signal,
                                   sr=fparam.MBE_SAMPLE_RATE,
                                   n_fft=int(fparam.MBE_FRAME_LENGTH*fparam.MBE_SAMPLE_RATE),
                                   hop_length=int(fparam.MBE_FRAME_SHIFT*fparam.MBE_SAMPLE_RATE),
                                   n_mels=fparam.MBE_ORDER)
                                   )
-        # compute how many segment can be cutted
-        cut_num = int((log_mbe.shape[1]-fparam.MBE_SEGMENT_LENGTH) / fparam.MBE_SEGMENT_SHIFT_TRAIN) + 1
-        for i in list(range(cut_num)):
-          np.save(os.path.join(feature_dir_abs, '{}.npy'.format(i+1)), log_mbe[:, i*fparam.MBE_SEGMENT_SHIFT_TRAIN : i*fparam.MBE_SEGMENT_SHIFT_TRAIN+fparam.MBE_SEGMENT_LENGTH])
-          label_content += os.path.join(feature_dir_relate, '{}.npy'.format(i+1)) + "   " + 'music'
+          # compute how many segment can be cutted
+          cut_num = int((log_mbe.shape[1]-fparam.MBE_SEGMENT_LENGTH) / fparam.MBE_SEGMENT_SHIFT_TRAIN) + 1
+          for i in list(range(cut_num)):
+            np.save(os.path.join(feature_dir_abs, '{}.npy'.format(i+1)), log_mbe[:, i*fparam.MBE_SEGMENT_SHIFT_TRAIN : i*fparam.MBE_SEGMENT_SHIFT_TRAIN+fparam.MBE_SEGMENT_LENGTH])
+            label_content += os.path.join(feature_dir_relate, '{}.npy'.format(i+1)) + "   " + 'music' + '\n'
         
-        print("{} file done!".format(filepath))
+          print("{} file done!".format(filepath))
 
 
   # extract and cut speech features
@@ -100,20 +105,24 @@ def main(musicroot, speechroot, fearoot):
         except:
           pass
         signal = load(filepath, labelpath, 'speech', fparam.MBE_SAMPLE_RATE)
-        # log_mbe.shape=[mbe_order, T_frames]
-        log_mbe = lrs.power_to_db(lrs.feature.melspectrogram(
+        if signal is None:
+          continue
+        else:
+
+          # log_mbe.shape=[mbe_order, T_frames]
+          log_mbe = lrs.power_to_db(lrs.feature.melspectrogram(
                                   y=signal,
                                   sr=fparam.MBE_SAMPLE_RATE,
                                   n_fft=int(fparam.MBE_FRAME_LENGTH*fparam.MBE_SAMPLE_RATE),
                                   hop_length=int(fparam.MBE_FRAME_SHIFT*fparam.MBE_SAMPLE_RATE),
                                   n_mels=fparam.MBE_ORDER)
                                   )
-        # compute how many segment can be cutted
-        cut_num = int((log_mbe.shape[1]-fparam.MBE_SEGMENT_LENGTH) / fparam.MBE_SEGMENT_SHIFT_TRAIN) + 1
-        for i in list(range(cut_num)):
-          np.save(os.path.join(feature_dir_abs, '{}.npy'.format(i+1)), log_mbe[:, i*fparam.MBE_SEGMENT_SHIFT_TRAIN : i*fparam.MBE_SEGMENT_SHIFT_TRAIN+fparam.MBE_SEGMENT_LENGTH])
-          label_content += os.path.join(feature_dir_relate, '{}.npy'.format(i+1)) + "   " + 'speech'
-        print("{} file done!".format(filepath))
+          # compute how many segment can be cutted
+          cut_num = int((log_mbe.shape[1]-fparam.MBE_SEGMENT_LENGTH) / fparam.MBE_SEGMENT_SHIFT_TRAIN) + 1
+          for i in list(range(cut_num)):
+            np.save(os.path.join(feature_dir_abs, '{}.npy'.format(i+1)), log_mbe[:, i*fparam.MBE_SEGMENT_SHIFT_TRAIN : i*fparam.MBE_SEGMENT_SHIFT_TRAIN+fparam.MBE_SEGMENT_LENGTH])
+            label_content += os.path.join(feature_dir_relate, '{}.npy'.format(i+1)) + "   " + 'speech' + '\n'
+          print("{} file done!".format(filepath))
 
   with open(os.path.join(fearoot, 'label.txt'), 'w') as f:
     f.write(label_content)
