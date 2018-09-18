@@ -59,7 +59,7 @@ def CNN():
 
   fnn_inputs = tf.reshape(dropout_outputs, [batches, 8*25*4])
   with tf.name_scope('fnn/1'):
-    fnn_outputs = tf.layers.dense(fnn_inputs, units=64,
+    fnn_outputs = tf.layers.dense(fnn_inputs, units=24,
                                   kernel_initializer=tf.contrib.layers.xavier_initializer(),
                                   kernel_regularizer=tf.contrib.layers.l1_regularizer(0.01),
                                   bias_regularizer=tf.contrib.layers.l1_regularizer(0.01))
@@ -84,9 +84,6 @@ def inference_single(filepath):
 
 
 def train():
-
-  # validation accuracy monitor
-  val_accuracy_monitor = []
 
   # iterator initialization
   asciter = ASCDataIterator()
@@ -170,20 +167,16 @@ def train():
                                        })
               val_accuracy_all += val_accuracy_
 
-          # # validation accuracy monitor
-          # monitor_length = 5
-          # if asciter.kth_epoch > 2 and len(val_accuracy_monitor[-monitor_length:]) != 0:
-          #   if val_accuracy_all < sum(val_accuracy_monitor[-monitor_length:])/ len(val_accuracy_monitor[-monitor_length:]):
-          #     # save model
-          #     logger.info("Epoch: %-2d, Batch: %-4d, Validation Accuracy: %-5f, Accuracy  decrease, exit training, don't save current model!" % (asciter.kth_epoch, asciter.ith_batch, val_accuracy_all/val_batch_num))
-          #     break
-
-          # val_accuracy_monitor.append(val_accuracy_all)
-          # save model
-          saver.save(sess, checkpoint_prefix)
+          saver.save(sess, checkpoint_prefix+"-{}-{}".format(asciter.kth_epoch, asciter.ith_batch))
           asciter.save(os.path.join(MODEL_ROOT, 'ASCDataIterator.ckpt'))
           logger.info("Epoch: %-2d, Batch: %-4d, Validation Accuracy: %-5f, Model saved!" % (asciter.kth_epoch, asciter.ith_batch, val_accuracy_all/val_batch_num))
-      
+          
+          # if epoch done, compute the average train accuracy
+          if epoch_done:
+            train_batch_num = int(len(asciter.train_list) / asciter.batch_size) + 1
+            train_accuracy_all = 0
+            for i in list(range(train_batch_num)):
+              train_data, 
       else:
         break
 

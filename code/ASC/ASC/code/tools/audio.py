@@ -11,3 +11,4 @@ import os
 import librosa as lrs
 
 # extract mbe features
+from ASC.code.base import fparam

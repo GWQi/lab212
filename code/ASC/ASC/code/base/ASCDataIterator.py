@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # *************************************************
 # Author: guwenqi
-# Last modified:
+# Last modified: 2018-9-18
 # Email: hey_xiaoqi@163.com
 # Filename: ASCDataIterator.py
 # Description: this file is the data fetcher of speech/music data
@@ -72,6 +72,8 @@ class ASCDataIterator(DataIterator):
       data_list = self.val_list[start:end]
     elif dataname == 'test':
       data_list = self.test_list[start:end]
+    elif dataname == 'train':
+      data_list = self.train_list[start:end]
     else:
       raise('you just can fetch validation data and test data')
 
