@@ -10,7 +10,7 @@ import os
 import pickle
 import numpy as np
 from random import shuffle
-from DataIterator import DataIterator
+from ASC.code.base.DataIterator import DataIterator
 
 class ASCDataIterator(DataIterator):
 
@@ -108,17 +108,19 @@ class ASCDataIterator(DataIterator):
       for aline in f.readlines():
         self.data_list.append(aline.strip().split())
 
-    val_size = int(len(self.data_list) * val_partion)
-    # shuffle data list 20 times
-    for i in range(20):
-      shuffle(self.data_list)
-
-    self.train_list = self.data_list[0:-val_size]
-    self.val_list = self.data_list[-val_size:]
+    # get train/validationtest data list
+    gap = int(1 / val_partion)
+    for i in list(range(len(self.data_list))):
+      if i % gap == 0:
+        self.val_list.append(self.data_list[i])
+      else:
+        self.train_list.append(self.data_list[i])
     self.test_list = list(self.val_list)
 
     # generate train indexes
     self.train_indexes = list(range(len(self.train_list)))
+    for i in list(range(20)):
+      shuffle(self.train_list)
     return
 
   # @override

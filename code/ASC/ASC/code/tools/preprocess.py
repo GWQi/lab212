@@ -26,7 +26,7 @@ def load(filepath, labelpath, category, sr):
   """
   try:
     label = readlabel(labelpath)
-  except FileNotFoundError as e:
+  except:
     print("The {} file does not has corresponding label file!".format(filepath))
     return None
 
@@ -128,6 +128,6 @@ def main(musicroot, speechroot, fearoot):
     f.write(label_content)
 
 if __name__ == '__main__':
-  main('/media/guwenqi/Seagate Expansion Drive/ASC/train/music',
-       '/media/guwenqi/Seagate Expansion Drive/ASC/train/speech',
-       '/media/guwenqi/Seagate Expansion Drive/ASC/train/feature')
+  main('/home/guwenqi/Documents/ASC/train/music',
+       '/home/guwenqi/Documents/ASC/train/speech',
+       '/home/guwenqi/Documents/ASC/train/mbe_feature')
