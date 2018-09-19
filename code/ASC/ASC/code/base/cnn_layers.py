@@ -60,8 +60,41 @@ def conv2d_bn_relu_pool_drop_layer(inputs_layer, out_channels, keep_prob, is_tra
 
   return outputs_layer
 
-
-
+def conv2d_bn_relu_pool_drop_layer_(inputs, filters, kernel_size, conv_strides,
+                                    pool_size, pool_strides, is_training, keep_prob,
+                                    dilation_rate=(1, 1), conv_pad='same', pool_pad='same'):
+  """
+  construct a convlution layers, with batch normalization, relu activation, max pooling, dropout layers
+  params:
+    inputs : 4D tensor inputs, inputs.shape=[batches, hight, width, channel]
+    filters : int, number of filters/channels of outputs
+    kernel_size : int or list/tuple of 2 integers, (hight, width)
+    conv_strides : int or list/tuple of 2 integers, (hight, width)
+    pool_size : int or list/tuple of 2 integers, (pool_hight, pool_width)
+    pool_strides : int or list/tuple of 2 integers,, (hight, width)
+    is_training : python bool or tf.bool(normally placeholder), weather in training phase
+    keep_prob : keep probability when dropout, between 0 and 1
+    dilation_rate : dilation rate along hight and width
+    conv_pad : convolutional padding, 'same' or 'valid'
+    pool_pad : pooling padding, 'same' or 'valid'
+  """
+  # convolution layer
+  conv_outputs = tf.layers.conv2d(inputs, filters, kernel_size,
+                                  strides=conv_strides, padding=conv_pad,
+                                  dilation_rate=dilation_rate,
+                                  kernel_initializer=tf.contrib.layers.xavier_initializer())
+  # batch normalization
+  batch_norm_outputs = tf.layers.batch_normalization(conv_outputs, training=is_training)
+  # relu activation
+  relu_outputs = tf.nn.relu(batch_norm_outputs)
+  # pooling layer
+  pooling_outputs = tf.layers.max_pooling2d(relu_outputs, pool_size,
+                                            pool_strides, padding=pool_pad)
+  # apply dropout
+  dropout_outputs = tf.layers.dropout(pooling_outputs, rate=1-keep_prob,
+                                      training=is_training)
+  return dropout_outputs
+  
 def residual_block(inputs_layer, kernel_size, out_channels, is_training, keep_prob, active_function, ith_block):
   """
   construct a residual block

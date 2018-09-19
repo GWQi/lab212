@@ -80,7 +80,7 @@ def create_inference_graph():
   return inputs, probs
 
 
-def single_file_inference(filepath, labelpath, plot=False):
+def single_file_inference(filepath, labelpath=None):
   """
   tag one singel audio file
   param filepath : string, path of the audio
@@ -95,11 +95,15 @@ def single_file_inference(filepath, labelpath, plot=False):
     data = audio2MBE_inputs(filepath)
     probs = sess.run(probabilities, feed_dict={inputs : data})
 
-    # smooth the probs
+    # smooth the probs, post-procession
     probs_smooth = medium_smooth(probs)
 
     # classification
     binary = np.where(probs_smooth > 0.5, 1, 0)
+
+    # if labelpath is None, plot the resault
+    if labelpath is None:
+      
     
 
 

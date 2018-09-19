@@ -60,7 +60,7 @@ def CNN():
 
   fnn_inputs = tf.reshape(dropout_outputs, [batches, 8*25*4])
   with tf.name_scope('fnn/1'):
-    fnn_outputs = tf.layers.dense(fnn_inputs, units=24,
+    fnn_outputs = tf.layers.dense(fnn_inputs, units=128,
                                   kernel_initializer=tf.contrib.layers.xavier_initializer(),
                                   kernel_regularizer=tf.contrib.layers.l1_regularizer(0.01),
                                   bias_regularizer=tf.contrib.layers.l1_regularizer(0.01))
@@ -122,7 +122,7 @@ def train():
 
     predicts = tf.where(tf.nn.sigmoid(network['logits']) >= 0.5, tf.ones_like(network['logits'], dtype=tf.int32), tf.zeros_like(network['logits'], dtype=tf.int32))
     accuracy = tf.reduce_mean(tf.cast(tf.equal(predicts, network['targets']), dtype=tf.float32))
-    saver = tf.train.Saver(max_to_keep=800)
+    saver = tf.train.Saver(max_to_keep=200)
 
 
   with tf.Session(graph=g_train) as sess:
@@ -150,7 +150,7 @@ def train():
                             network['inputs'] : data,
                             network['targets'] : targets,
                             network['is_training'] : True,
-                            network['learning_rate'] : 0.001 * 0.9**asciter.kth_epoch
+                            network['learning_rate'] : 0.001# * 0.99**asciter.kth_epoch
                             })
         # print("epoch: {}, batch: {}, cost: {}, accuracy: {}".format(asciter.kth_epoch, asciter.ith_batch, cost_, accuracy_))
         count += 1
@@ -188,26 +188,26 @@ def train():
           saver.save(sess, checkpoint_prefix+"-{}-{}".format(asciter.kth_epoch, asciter.ith_batch))
           asciter.save(os.path.join(MODEL_ROOT, 'ASCDataIterator.ckpt'))
           logger.info("Epoch: %-2d, Batch: %-4d, Validation Accuracy: %-5f, Model saved!" % (asciter.kth_epoch, asciter.ith_batch, val_accuracy_all/val_batch_num))
-          
-          # # if epoch done, compute the average train accuracy
-          # if epoch_done:
-          #   train_batch_num = int(len(asciter.train_list) / asciter.batch_size) + 1
-          #   train_accuracy_all = 0
-          #   for i in list(range(train_batch_num)):
-          #     train_data, train_targets = asciter.fetch_data(i*asciter.batch_size, (i+1)*asciter.batch_size, 'train')
-          #     if (len(train_data) != 0):
-          #       train_accuracy_ = sess.run(accuracy,
-          #                                  feed_dict={
-          #                                  network['inputs'] : train_data,
-          #                                  network['targets'] : train_targets,
-          #                                  network['is_training'] : False,
-          #                                  network['learning_rate'] : 0.001 * 0.9**asciter.kth_epoch
-          #                                  })
-          #       train_accuracy_all += train_accuracy_
-          #   logger.info("Epoch: %-2d, Batch: %-4d, Training Set Accuracy: %-5f" % (asciter.kth_epoch, asciter.ith_batch, train_accuracy_all/train_batch_num))
+
+    # if epoch done, compute the average train accuracy
+    # if True:
+    #   train_batch_num = int(len(asciter.train_list) / asciter.batch_size) + 1
+    #   train_accuracy_all = 0
+    #   for i in list(range(train_batch_num)):
+    #     train_data, train_targets = asciter.fetch_data(i*asciter.batch_size, (i+1)*asciter.batch_size, 'train')
+    #     if (len(train_data) != 0):
+    #       train_accuracy_ = sess.run(accuracy,
+    #                                 feed_dict={
+    #                                 network['inputs'] : train_data,
+    #                                 network['targets'] : train_targets,
+    #                                 network['is_training'] : False,
+    #                                 network['learning_rate'] : 0.001 * 0.9**asciter.kth_epoch
+    #                                 })
+    #       train_accuracy_all += train_accuracy_
+    #   logger.info("Epoch: %-2d, Batch: %-4d, Training Set Accuracy: %-5f" % (asciter.kth_epoch, asciter.ith_batch, train_accuracy_all/train_batch_num))
       
-      else:
-        break
+      # else:
+      #   break
 
 if __name__ == '__main__':
   train()

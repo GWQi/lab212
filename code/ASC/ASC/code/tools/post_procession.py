@@ -9,6 +9,9 @@
 
 import numpy as np
 
+from ASC.code.base import fparam
+from ASC.code.base.universe import SPEECH_MUSIC_DIC_R
+
 def medium_smooth(probs, context=2):
   """
   apply medium filter to smooth the probs
@@ -42,3 +45,19 @@ def median_smooth(classifications, context=2):
     classifications[i] = classifications_pad[i:i+2*context+1].median()
 
   return classifications
+
+def MBEBinary2speech_music_labels(binaries):
+  """
+  given binaries of music/speech classification, get its corresponding label content
+  param binary : binary classification
+  return content : string, label file content
+  """
+  binaries = np.asarray(binaries, dtype=np.int32)
+  content = ""
+  start = 0
+  for idx in list(range(1, binaries.size)):
+    if binaries[idx] != binaries[idx-1]:
+      content += "{} {} {}\n".format(start*fparam.MBE_SEGMENT_SHIFT_TEST*fparam.MBE_FRAME_SHIFT,
+                                     idx*fparam.MBE_SEGMENT_SHIFT_TEST*fparam.MBE_FRAME_SHIFT,
+                                     SPEECH_MUSIC_DIC_R[binaries[idx-1]])
+      start = idx
