@@ -7,14 +7,28 @@
 # Description: This class is used to monitor the training session
 # *************************************************
 
-from abc import ABCMeta, abstractmethod
-
-class MonitorBase(object):
-  # base abstract class for monitor
-  __metaclass__ = ABCMeta
+class Monitor(object):
+  # base class for monitor
 
   def __init__(self):
     """
     some values need to be monitored
     """
     self.accuracy = []
+    self.last_checkpoint=''
+
+
+  def set_last_checkpoint(self, path):
+    """
+    set the last check piont path
+    """
+    self.last_checkpoint = path
+
+  def get_last_checkpoint(self, path):
+    """
+    get the last check point path
+    """
+    return self.last_checkpoint
+
+  def load(self):
+    pass

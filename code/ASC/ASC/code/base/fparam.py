@@ -22,7 +22,7 @@ MBE_SEGMENT_LENGTH = 100
 # mbe context shift in frames while training model
 MBE_SEGMENT_SHIFT_TRAIN = 33
 # mbe context shift in frames in test phase
-MBE_SEGMENT_SHIFT_TEST = 10
+MBE_SEGMENT_SHIFT_TEST = 5
 # mbe model operating sample rate
 MBE_SAMPLE_RATE = 16000
 

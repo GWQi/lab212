@@ -11,6 +11,7 @@ import pickle
 import numpy as np
 from random import shuffle
 from ASC.code.base.DataIterator import DataIterator
+from ASC.code.base.universe import SPEECH_MUSIC_DIC
 
 class ASCDataIterator(DataIterator):
 
@@ -18,7 +19,7 @@ class ASCDataIterator(DataIterator):
     super(ASCDataIterator, self).__init__()
     # self.data_list = [[filepath, label], [filepath, label], ...]
 
-    self.binary_class = {'speech' : 1, 'music' : 0}
+    self.binary_class = dict(SPEECH_MUSIC_DIC)
     self.multi_class = {'speech' : [1, 0], 'music' : [0, 1]}
 
 
