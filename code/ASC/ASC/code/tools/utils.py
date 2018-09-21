@@ -38,3 +38,8 @@ def compute_delta(features, win=3, method='filter', filt=numpy.array([.25, .5, .
     delta[:, i] = numpy.convolve(features[:, i], filt)
 
   return delta[win:-win, :]
+
+
+def reconstruct(rootdir, dstdir):
+  """
+  """

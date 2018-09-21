@@ -21,7 +21,6 @@ from ASC.code.base.cnn_layers import conv2d_bn_relu_pool_drop_layer
 from ASC.code.base.dnn_layers import fnn_bn_relu_drop_layer
 from ASC.code.tools.audio import audio2MBE_inputs
 from ASC.code.tools.post_procession import MBEProbs2speech_music_single
-from ASC.code.base import fparam
 
 MODEL_ROOT = '/home/guwenqi/Documents/ASC/train/model/cnn/classical'
 checkpoint_prefix = os.path.join(MODEL_ROOT, 'ckpt')
@@ -44,7 +43,7 @@ def CNN(inputs, is_training):
   cnn_inputs = tf.expand_dims(inputs, axis=-1)
   with tf.name_scope("cnn/1"):
     conv_outputs = tf.layers.conv2d(cnn_inputs,
-                                    filters=8, kernel_size=[5, 5],
+                                    filters=4, kernel_size=[5, 5],
                                     strides=[2, 2], padding='same',
                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
     batch_norm = tf.layers.batch_normalization(conv_outputs, training=is_training)
@@ -53,7 +52,7 @@ def CNN(inputs, is_training):
     dropout_outputs = tf.layers.dropout(pool_outputs, training=is_training)
 
 
-  fnn_inputs = tf.reshape(dropout_outputs, [batches, 8*25*8])
+  fnn_inputs = tf.reshape(dropout_outputs, [batches, 8*25*4])
   with tf.name_scope('fnn/1'):
     fnn_outputs = tf.layers.dense(fnn_inputs, units=24, use_bias=False,
                                   kernel_initializer=tf.contrib.layers.xavier_initializer(),
@@ -94,8 +93,8 @@ def CNN2(inputs, is_training):
   # insert one dim at end
   cnn_inputs = tf.expand_dims(inputs, axis=-1)
   for i in list(range(cnn_layers_num)):
-    with tf.name_scope("cnn/%d" % (i+1))
-      cnn_inputs = conv2d_bn_relu_pool_drop_layer_(cnn_inputs, filters[i], kernel_sizes[i], conv_strides[i],
+    with tf.name_scope("cnn/%d" % (i+1)):
+      cnn_inputs = conv2d_bn_relu_pool_drop_layer(cnn_inputs, filters[i], kernel_sizes[i], conv_strides[i],
                                                    pool_sizes[i], pool_strides[i], is_training, 0.5,
                                                    dilation_rate=(1, 1), conv_pad='same', pool_pad='same')
   
@@ -141,7 +140,22 @@ def single_file_inference(filepath, labelpath=None):
 
     MBEProbs2speech_music_single(filepath, probs, labelpath=labelpath, context=2)
 
+def batch_file_inference(wavdir, labeldir=None):
+  """
+  tag all wav files under wavdir
+  param wavdir : string, directory path under which wav files need to be tagged
+  param labeldir : string, directory under which to store the label files
+  """
+  """
+  inputs, probabilities = create_inference_graph()
+  saver = tf.train.Saver()
 
+  # ce=reate session
+  with tf.Session() as sess:
+    saver.restore(sess, model_prefix)
+
+  """
+  pass
 
 def train():
 
@@ -175,16 +189,15 @@ def train():
     # get logits from network
     logits = CNN(inputs, is_training)
 
-    cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.to_float(targets), logits=logits))
+    loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.to_float(targets), logits=logits))
     predicts = tf.where(tf.nn.sigmoid(logits) >= 0.5, tf.ones_like(logits, dtype=tf.int32), tf.zeros_like(logits, dtype=tf.int32))
     accuracy = tf.reduce_mean(tf.cast(tf.equal(predicts, targets), dtype=tf.float32))
 
-    optimizer = tf.train.AdamOptimizer(learning_rate=network['learning_rate'])
+    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     # because the batch normalization relies on no-gradient updates, so we need add tf.control_dependencies
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
-      grads_and_vars = optimizer.compute_gradients(cost)
-      train_op = optimizer.apply_gradients(grads_and_vars)
+      train_op = optimizer.minimize(loss)
 
     saver = tf.train.Saver(max_to_keep=10)
 
@@ -201,7 +214,7 @@ def train():
     print('Begain training')
 
     count = 0
-    cost_all = 0
+    loss_all = 0
     accuracy_all = 0
     while True:
       # fetch data
@@ -209,26 +222,26 @@ def train():
 
       if data is not None:
 
-        cost_, _, accuracy_ = sess.run([cost, train_op, accuracy],
+        loss_, _, accuracy_ = sess.run([loss, train_op, accuracy],
                             feed_dict={
                             inputs : data,
                             targets : labels,
                             is_training : True,
-                            learning_rate : 0.001 * 0.9**asciter.kth_epoch
+                            learning_rate : 0.001 * 0.8**asciter.kth_epoch
                             })
-        # print("epoch: {}, batch: {}, cost: {}, accuracy: {}".format(asciter.kth_epoch, asciter.ith_batch, cost_, accuracy_))
+        # print("epoch: {}, batch: {}, loss: {}, accuracy: {}".format(asciter.kth_epoch, asciter.ith_batch, loss_, accuracy_))
         count += 1
-        cost_all += cost_
+        loss_all += loss_
         accuracy_all += accuracy_
 
         if asciter.ith_batch % 100 == 0:
-          cost_ave = cost_all / count
+          loss_ave = loss_all / count
           accuracy_ave = accuracy_all / count
-          cost_all = 0
+          loss_all = 0
           accuracy_all = 0
           count = 0
 
-          print("Epoch: %-2d, Batch: %-4d, Average cost: %-5f, Average accuracy: %-5f." % (asciter.kth_epoch, asciter.ith_batch, cost_ave, accuracy_ave))
+          print("Epoch: %-2d, Batch: %-4d, Average loss: %-5f, Average accuracy: %-5f." % (asciter.kth_epoch, asciter.ith_batch, loss_ave, accuracy_ave))
 
         if asciter.ith_batch % 500 == 0 or epoch_done:
           # validation
@@ -242,7 +255,7 @@ def train():
                                        inputs : val_data,
                                        targets : val_targets,
                                        is_training : False,
-                                       learning_rate : 0.001 * 0.9**asciter.kth_epoch
+                                       learning_rate : 0.001 * 0.8**asciter.kth_epoch
                                        })
               val_accuracy_all += val_accuracy_
 

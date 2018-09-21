@@ -33,34 +33,8 @@ def conv2d_bn_relu_drop_layer(inputs_layer, weight, stride_h, stride_w, keep_pro
 
   return outputs_layer
 
-def conv2d_bn_relu_pool_drop_layer(inputs_layer, out_channels, keep_prob, is_training, kernal_size=3, kernal_strides=1, pool_strides=2):
-  """
-  a helper function to conv, batch normalization, relu activation
-  params:
-    inputs_layer : 4D tensor, shape-[batch, hight, width, channel]
-    out_channels : int
-    kernel_size : An integer or tuple/list of 2 integers, specifying the height and width of the 2D convolution 
-    kernal_strides :  An integer or tuple/list of 2 integers, specifying the strides of the convolution along the height and width
-    pool_strides : An integer or tuple/list of 2 integers, specifying the strides of the max pooling along the height and width
-    is_training : weather training or validation, training phase if True
-    keep_prob : float, keep probability when drop out
-  return:
-    outputs of this layer
-  """
-  # convolution layer
-  conv_layer = tf.layers.conv2d(inputs_layer, out_channels, kernal_size, kernal_strides, padding='same', kernel_initializer=tf.contrib.layers.xavier_initializer())
-  # batch normalizatiom
-  batch_norm = tf.layers.batch_normalization(conv_layer, training=is_training)
-  # activation
-  relu_layer = tf.nn.relu(batch_norm)
-  # max pooling layer
-  pool_layer = tf.layers.max_pooling2d(relu_layer, 2, pool_strides, padding='same')
-  # drop out
-  outputs_layer = tf.contrib.layers.dropout(pool_layer, keep_prob=keep_prob, is_training=is_training)
 
-  return outputs_layer
-
-def conv2d_bn_relu_pool_drop_layer_(inputs, filters, kernel_size, conv_strides,
+def conv2d_bn_relu_pool_drop_layer(inputs, filters, kernel_size, conv_strides,
                                     pool_size, pool_strides, is_training, keep_prob,
                                     dilation_rate=(1, 1), conv_pad='same', pool_pad='same'):
   """

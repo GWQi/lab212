@@ -17,10 +17,8 @@ ASC_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirna
 sys.path.append(ASC_PROJECT_ROOT)
 
 from ASC.code.base.ASCDataIterator import ASCDataIterator
-from ASC.code.base.cnn_layers import conv2d_bn_relu_pool_drop_layer
 from ASC.code.base.dnn_layers import fnn_bn_relu_drop_layer
 from ASC.code.tools.audio import audio2MBE_inputs
-from ASC.code.base import fparam
 
 MODEL_ROOT = '/home/guwenqi/Documents/ASC/train/model/cnn/classical'
 checkpoint_prefix = os.path.join(MODEL_ROOT, 'ckpt')
@@ -60,7 +58,7 @@ def CNN():
 
   fnn_inputs = tf.reshape(dropout_outputs, [batches, 8*25*4])
   with tf.name_scope('fnn/1'):
-    fnn_outputs = tf.layers.dense(fnn_inputs, units=32,
+    fnn_outputs = tf.layers.dense(fnn_inputs, units=16,
                                   kernel_initializer=tf.contrib.layers.xavier_initializer(),
                                   kernel_regularizer=tf.contrib.layers.l1_regularizer(0.01),
                                   bias_regularizer=tf.contrib.layers.l1_regularizer(0.01))
@@ -128,6 +126,7 @@ def train():
     with tf.control_dependencies(update_ops):
       grads_and_vars = optimizer.compute_gradients(cost)
       train_op = optimizer.apply_gradients(grads_and_vars)
+      # train_op = optimizer.minimize(cost)
     
     saver = tf.train.Saver(max_to_keep=200)
 
