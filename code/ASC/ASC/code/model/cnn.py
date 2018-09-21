@@ -60,7 +60,7 @@ def CNN():
 
   fnn_inputs = tf.reshape(dropout_outputs, [batches, 8*25*4])
   with tf.name_scope('fnn/1'):
-    fnn_outputs = tf.layers.dense(fnn_inputs, units=128,
+    fnn_outputs = tf.layers.dense(fnn_inputs, units=32,
                                   kernel_initializer=tf.contrib.layers.xavier_initializer(),
                                   kernel_regularizer=tf.contrib.layers.l1_regularizer(0.01),
                                   bias_regularizer=tf.contrib.layers.l1_regularizer(0.01))
@@ -118,12 +118,18 @@ def train():
   with g_train.as_default():
     network = CNN()
     cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.to_float(network['targets']), logits=network['logits']))
-    optimizer = tf.train.AdamOptimizer(learning_rate=network['learning_rate']).minimize(cost)
-
     predicts = tf.where(tf.nn.sigmoid(network['logits']) >= 0.5, tf.ones_like(network['logits'], dtype=tf.int32), tf.zeros_like(network['logits'], dtype=tf.int32))
     accuracy = tf.reduce_mean(tf.cast(tf.equal(predicts, network['targets']), dtype=tf.float32))
+    
+    optimizer = tf.train.AdamOptimizer(learning_rate=network['learning_rate'])
+    # because the batch normalization relies on no-gradient updates, so we need add tf.control_dependencies
+    # TODO: apply gradient clip
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+      grads_and_vars = optimizer.compute_gradients(cost)
+      train_op = optimizer.apply_gradients(grads_and_vars)
+    
     saver = tf.train.Saver(max_to_keep=200)
-
 
   with tf.Session(graph=g_train) as sess:
     try:
@@ -145,12 +151,12 @@ def train():
 
       if data is not None:
 
-        cost_, _, accuracy_ = sess.run([cost, optimizer, accuracy],
+        cost_, _, accuracy_ = sess.run([cost, train_op, accuracy],
                             feed_dict={
                             network['inputs'] : data,
                             network['targets'] : targets,
                             network['is_training'] : True,
-                            network['learning_rate'] : 0.001# * 0.99**asciter.kth_epoch
+                            network['learning_rate'] : 0.001 * 0.8**asciter.kth_epoch
                             })
         # print("epoch: {}, batch: {}, cost: {}, accuracy: {}".format(asciter.kth_epoch, asciter.ith_batch, cost_, accuracy_))
         count += 1
@@ -189,7 +195,7 @@ def train():
           asciter.save(os.path.join(MODEL_ROOT, 'ASCDataIterator.ckpt'))
           logger.info("Epoch: %-2d, Batch: %-4d, Validation Accuracy: %-5f, Model saved!" % (asciter.kth_epoch, asciter.ith_batch, val_accuracy_all/val_batch_num))
 
-    # if epoch done, compute the average train accuracy
+    # # if epoch done, compute the average train accuracy
     # if True:
     #   train_batch_num = int(len(asciter.train_list) / asciter.batch_size) + 1
     #   train_accuracy_all = 0
@@ -204,10 +210,11 @@ def train():
     #                                 network['learning_rate'] : 0.001 * 0.9**asciter.kth_epoch
     #                                 })
     #       train_accuracy_all += train_accuracy_
-    #   logger.info("Epoch: %-2d, Batch: %-4d, Training Set Accuracy: %-5f" % (asciter.kth_epoch, asciter.ith_batch, train_accuracy_all/train_batch_num))
-      
-      # else:
-      #   break
+    #   # logger.info("Epoch: %-2d, Batch: %-4d, Training Set Accuracy: %-5f" % (asciter.kth_epoch, asciter.ith_batch, train_accuracy_all/train_batch_num))
+    #   print("Epoch: %-2d, Batch: %-4d, Training Set Accuracy: %-5f" % (asciter.kth_epoch, asciter.ith_batch, train_accuracy_all/train_batch_num))
+
+      else:
+        break
 
 if __name__ == '__main__':
   train()

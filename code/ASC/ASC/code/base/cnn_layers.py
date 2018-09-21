@@ -81,7 +81,7 @@ def conv2d_bn_relu_pool_drop_layer_(inputs, filters, kernel_size, conv_strides,
   # convolution layer
   conv_outputs = tf.layers.conv2d(inputs, filters, kernel_size,
                                   strides=conv_strides, padding=conv_pad,
-                                  dilation_rate=dilation_rate,
+                                  dilation_rate=dilation_rate, use_bias=False,
                                   kernel_initializer=tf.contrib.layers.xavier_initializer())
   # batch normalization
   batch_norm_outputs = tf.layers.batch_normalization(conv_outputs, training=is_training)

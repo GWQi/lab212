@@ -9,8 +9,8 @@
 
 import os
 import sys
+import math
 import logging
-import numpy as np
 import tensorflow as tf
 
 ASC_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -20,7 +20,7 @@ from ASC.code.base.ASCDataIterator import ASCDataIterator
 from ASC.code.base.cnn_layers import conv2d_bn_relu_pool_drop_layer
 from ASC.code.base.dnn_layers import fnn_bn_relu_drop_layer
 from ASC.code.tools.audio import audio2MBE_inputs
-from ASC.code.tools.post_procession import medium_smooth
+from ASC.code.tools.post_procession import MBEProbs2speech_music_single
 from ASC.code.base import fparam
 
 MODEL_ROOT = '/home/guwenqi/Documents/ASC/train/model/cnn/classical'
@@ -44,7 +44,7 @@ def CNN(inputs, is_training):
   cnn_inputs = tf.expand_dims(inputs, axis=-1)
   with tf.name_scope("cnn/1"):
     conv_outputs = tf.layers.conv2d(cnn_inputs,
-                                    filters=4, kernel_size=[5, 5],
+                                    filters=8, kernel_size=[5, 5],
                                     strides=[2, 2], padding='same',
                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
     batch_norm = tf.layers.batch_normalization(conv_outputs, training=is_training)
@@ -53,18 +53,61 @@ def CNN(inputs, is_training):
     dropout_outputs = tf.layers.dropout(pool_outputs, training=is_training)
 
 
-  fnn_inputs = tf.reshape(dropout_outputs, [batches, 8*25*4])
+  fnn_inputs = tf.reshape(dropout_outputs, [batches, 8*25*8])
   with tf.name_scope('fnn/1'):
-    fnn_outputs = tf.layers.dense(fnn_inputs, units=20,
+    fnn_outputs = tf.layers.dense(fnn_inputs, units=24, use_bias=False,
                                   kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                  kernel_regularizer=tf.contrib.layers.l1_regularizer(0.01),
-                                  bias_regularizer=tf.contrib.layers.l1_regularizer(0.01))
+                                  kernel_regularizer=tf.contrib.layers.l1_regularizer(0.01))
     batch_norm = tf.layers.batch_normalization(fnn_outputs, training=is_training)
     relu_outputs = tf.nn.relu(batch_norm)
     dropout_outputs = tf.layers.dropout(relu_outputs, rate=0.3, training=is_training)
 
   with tf.name_scope('logits'):
     logits = tf.squeeze(tf.layers.dense(dropout_outputs, units=1,
+                        kernel_initializer=tf.contrib.layers.xavier_initializer()))
+  return logits
+
+def CNN2(inputs, is_training):
+  """
+  construct a two cnn layers + 1 fnn network
+  param : inputs, inputs of this network should have shape=[batch, mbe_order, T_frames]
+  param : is_training, bool, weather in train phrase
+  """
+  # network configuration
+  cnn_layers_num = 2
+  filters = [8, 16]
+  kernel_sizes = [[5, 5], [5, 5]]
+  conv_strides = [[2, 2], [1, 1]]
+  pool_sizes = [[2, 2], [2, 2]]
+  pool_strides = [[2, 2], [2, 2]]
+  hight = 32
+  width = 100
+  for i in list(range(cnn_layers_num)):
+    hight = int(math.ceil(math.ceil(32/conv_strides[i][0]) / pool_strides[i][0]))
+    width = int(math.ceil(math.ceil(32/conv_strides[i][1]) / pool_strides[i][1]))
+  cnn_units = hight * width * filters[-1]
+
+
+  # now start construct network
+  batches = tf.shape(inputs)[0]
+  # cnn layers
+  # insert one dim at end
+  cnn_inputs = tf.expand_dims(inputs, axis=-1)
+  for i in list(range(cnn_layers_num)):
+    with tf.name_scope("cnn/%d" % (i+1))
+      cnn_inputs = conv2d_bn_relu_pool_drop_layer_(cnn_inputs, filters[i], kernel_sizes[i], conv_strides[i],
+                                                   pool_sizes[i], pool_strides[i], is_training, 0.5,
+                                                   dilation_rate=(1, 1), conv_pad='same', pool_pad='same')
+  
+  # fnn layers
+  fnn_inputs = tf.reshape(cnn_inputs, [batches, cnn_units])
+  with tf.name_scope('fnn/1'):
+    fnn_outputs = fnn_bn_relu_drop_layer(fnn_inputs, cnn_units, keep_prob=0.5, is_training=is_training,
+                                         kernel_regularizer=tf.contrib.layers.l1_regularizer(0.01))
+
+  # logits
+  with tf.name_scope('logits'):
+    logits = tf.squeeze(tf.layers.dense(fnn_outputs, units=1,
                         kernel_initializer=tf.contrib.layers.xavier_initializer()))
   return logits
 
@@ -84,6 +127,7 @@ def single_file_inference(filepath, labelpath=None):
   """
   tag one singel audio file
   param filepath : string, path of the audio
+  param labelpath : string, path where to store the labels
   """
   inputs, probabilities = create_inference_graph()
   saver = tf.train.Saver()
@@ -95,16 +139,7 @@ def single_file_inference(filepath, labelpath=None):
     data = audio2MBE_inputs(filepath)
     probs = sess.run(probabilities, feed_dict={inputs : data})
 
-    # smooth the probs, post-procession
-    probs_smooth = medium_smooth(probs)
-
-    # classification
-    binary = np.where(probs_smooth > 0.5, 1, 0)
-
-    # if labelpath is None, plot the resault
-    if labelpath is None:
-      
-    
+    MBEProbs2speech_music_single(filepath, probs, labelpath=labelpath, context=2)
 
 
 
@@ -141,10 +176,16 @@ def train():
     logits = CNN(inputs, is_training)
 
     cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.to_float(targets), logits=logits))
-    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
-
     predicts = tf.where(tf.nn.sigmoid(logits) >= 0.5, tf.ones_like(logits, dtype=tf.int32), tf.zeros_like(logits, dtype=tf.int32))
     accuracy = tf.reduce_mean(tf.cast(tf.equal(predicts, targets), dtype=tf.float32))
+
+    optimizer = tf.train.AdamOptimizer(learning_rate=network['learning_rate'])
+    # because the batch normalization relies on no-gradient updates, so we need add tf.control_dependencies
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+      grads_and_vars = optimizer.compute_gradients(cost)
+      train_op = optimizer.apply_gradients(grads_and_vars)
+
     saver = tf.train.Saver(max_to_keep=10)
 
 
@@ -168,7 +209,7 @@ def train():
 
       if data is not None:
 
-        cost_, _, accuracy_ = sess.run([cost, optimizer, accuracy],
+        cost_, _, accuracy_ = sess.run([cost, train_op, accuracy],
                             feed_dict={
                             inputs : data,
                             targets : labels,
