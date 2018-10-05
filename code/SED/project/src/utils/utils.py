@@ -22,15 +22,15 @@ def compute_delta(features, win=3, method='filter', filt=numpy.array([.25, .5, .
   """
   # First and last features are appended to the begining and the end of the 
   # stream to avoid border effect
-  x = numpy.zeros((features.shape[0] + 2 * win, features.shape[1]), dtype=NPDTYPE_DATA)
+  x = numpy.zeros((features.shape[0] + 2 * win, features.shape[1]), dtype=features.dtype)
   x[:win, :] = features[0, :]
   x[win:-win, :] = features
   x[-win:, :] = features[-1, :]
 
-  delta = numpy.zeros(x.shape, dtype=NPDTYPE_DATA)
+  delta = numpy.zeros(x.shape, dtype=features.dtype)
 
   if method == 'diff':
-    filt = numpy.zeros(2 * win + 1, dtype=NPDTYPE_DATA)
+    filt = numpy.zeros(2 * win + 1, dtype=features.dtype)
     filt[0] = -1
     filt[-1] = 1
 

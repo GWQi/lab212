@@ -204,10 +204,9 @@ def train():
 
   with tf.Session(graph=g_train) as sess:
     try:
-      last_checkpoint = ''
       with open(os.path.join(MODEL_ROOT, 'checkpoint'), 'r') as f:
         last_checkpoint = f.readline().strip().split()[-1].strip('"')
-      saver.restore(sess, last_checkpoint)
+        saver.restore(sess, last_checkpoint)
     except:
       tf.global_variables_initializer().run()
 

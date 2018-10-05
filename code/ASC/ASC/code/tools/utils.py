@@ -7,6 +7,7 @@
 # Description: this file contains some useful tools
 # *************************************************
 import numpy as np
+import os
 
 # reference: sidekit
 def compute_delta(features, win=3, method='filter', filt=numpy.array([.25, .5, .25, 0, -.25, -.5, -.25])):
@@ -42,4 +43,13 @@ def compute_delta(features, win=3, method='filter', filt=numpy.array([.25, .5, .
 
 def reconstruct(rootdir, dstdir):
   """
+  construct the same directory structure as rootdir at dstdir
+  param rootdir : string, root directory path
+  param dstdir : string, destination directory path
   """
+  try:
+    os.makedirs(dstdir)
+  except:
+    pass
+
+  for 
