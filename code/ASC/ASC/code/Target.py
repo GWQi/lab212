@@ -1033,7 +1033,8 @@ class Test(object):
                     label.append([(start, idx), 'music' if Db[idx-1] == -1 else 'speech'])
                     start = idx
 
-            label.append([(start, Db.size), 'music' if Db[-1] == -1 else 'speech'])
+            if Db[-1] == Db[-2]:
+                label.append([(start, Db.size), 'music' if Db[-1] == -1 else 'speech'])
 
             # this is the label content stored to disk
             lab_content = ""

@@ -11,6 +11,7 @@ import os
 import sys
 import math
 import logging
+import argparse
 import tensorflow as tf
 
 ASC_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -21,10 +22,10 @@ from ASC.code.base.cnn_layers import conv2d_bn_relu_pool_drop_layer
 from ASC.code.base.dnn_layers import fnn_bn_relu_drop_layer
 from ASC.code.tools.audio import audio2MBE_inputs
 from ASC.code.tools.post_procession import MBEProbs2speech_music_single
+from ASC.code.tools.utils import reconstruct
 
 MODEL_ROOT = '/home/guwenqi/Documents/ASC/train/model/cnn/classical'
 checkpoint_prefix = os.path.join(MODEL_ROOT, 'ckpt')
-model_prefix = ""
 
 DATA_ROOT = '/home/guwenqi/Documents/ASC/train/feature/mbe_feature'
 LABELS_PATH = '/home/guwenqi/Documents/ASC/train/feature/mbe_feature/label.txt'
@@ -122,7 +123,7 @@ def create_inference_graph():
   return inputs, probs
 
 
-def single_file_inference(filepath, labelpath=None):
+def single_file_inference(filepath, labelpath=""):
   """
   tag one singel audio file
   param filepath : string, path of the audio
@@ -131,31 +132,55 @@ def single_file_inference(filepath, labelpath=None):
   inputs, probabilities = create_inference_graph()
   saver = tf.train.Saver()
 
-  # ce=reate session
+  # create session
   with tf.Session() as sess:
-    saver.restore(sess, model_prefix)
+    try:
+      with open(os.path.join(MODEL_ROOT, 'checkpoint'), 'r') as f:
+        last_checkpoint = f.readline().strip().split()[-1].strip('"')
+        saver.restore(sess, last_checkpoint)
+    except:
+      raise IOError("can not restore the checkpoint file: {}".format(last_checkpoint))
 
     data = audio2MBE_inputs(filepath)
     probs = sess.run(probabilities, feed_dict={inputs : data})
 
     MBEProbs2speech_music_single(filepath, probs, labelpath=labelpath, context=2)
 
-def batch_file_inference(wavdir, labeldir=None):
+def batch_file_inference(wavdir, labeldir):
   """
   tag all wav files under wavdir
   param wavdir : string, directory path under which wav files need to be tagged
   param labeldir : string, directory under which to store the label files
   """
-  """
+
+  # first we reconstruct the directory structure
+  reconstruct(wavdir, labeldir)
+
   inputs, probabilities = create_inference_graph()
   saver = tf.train.Saver()
 
-  # ce=reate session
+  # create session
   with tf.Session() as sess:
-    saver.restore(sess, model_prefix)
+    try:
+      with open(os.path.join(MODEL_ROOT, 'checkpoint'), 'r') as f:
+        last_checkpoint = f.readline().strip().split()[-1].strip('"')
+        saver.restore(sess, last_checkpoint)
+    except:
+      raise IOError("can not restore the checkpoint file: {}".format(last_checkpoint))
+  
+    for root, dirlist, filelist in os.walk(wavdir):
+      for filename in filelist:
+        if filename.endswith(".wav"):
+          filepath = os.path.join(root, filename)
+          print(filepath + " done!")
 
-  """
-  pass
+          basename = filename.split('.')[0]
+          labelpath = os.path.join(root, basename+'.lab').replace(wavdir, labeldir)
+
+          data = audio2MBE_inputs(filepath)
+          probs = sess.run(probabilities, feed_dict={inputs : data})
+          MBEProbs2speech_music_single(filepath, probs, labelpath=labelpath, context=2)
+
 
 def train():
 
@@ -282,5 +307,28 @@ def train():
       else:
         break
 
+def main():
+
+  parser = argparse.ArgumentParser()
+  parser.add_argument("-t", "--task",     type=str,   choices=["train", "infer"], help="train or inference")
+  parser.add_argument("-s", "--source",   type=str,   default="",                help="source wav file(s) path")
+  parser.add_argument("-l", "--label",    type=str,   default="",                help="path where to save label files")
+  parser.add_argument("-b", "--batch",    action="store_true")
+
+  args = parser.parse_args()
+
+  if args.task == "train":
+    train()
+  elif args.task == "infer":
+    if args.batch:
+      batch_file_inference(args.source, args.label)
+    else:
+      single_file_inference(args.source, args.label)
+  else:
+    print("You must specify one task!")
+    sys.exit(-1)
+
+
+
 if __name__ == '__main__':
-  train()
+  main()

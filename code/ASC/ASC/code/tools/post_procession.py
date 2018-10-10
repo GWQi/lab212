@@ -6,7 +6,7 @@
 # Filename: post_procession.py
 # Description: this file is used for post-procession
 # *************************************************
-
+import sys
 import numpy as np
 from scipy.io import wavfile
 import matplotlib.pyplot as plt
@@ -19,7 +19,7 @@ def medium_smooth(probs, context=2):
   apply medium filter to smooth the probs
   params:
     probs : list/tuple/np.array of probabilities
-    context : int, window size is 1 + 2*context
+    context : smoothed context size, int, window size is 1 + 2*context
   return:
     prob : np.array, smoothed probabilities
   """
@@ -37,7 +37,7 @@ def median_smooth(classifications, context=2):
   apply median filter to smooth the classification resaults
   params:
     classifications : list/tuple/np.array of classification resaults
-    context : int, window size is 1 + 2*context
+    context : smoothed context size, int, window size is 1 + 2*context
   """
   classifications = np.asarray(classifications, dtype = np.int32)
   # pad edge values
@@ -59,11 +59,16 @@ def MBEBinary2speech_music_labels(binaries):
   start = 0
   for idx in list(range(1, binaries.size)):
     if binaries[idx] != binaries[idx-1]:
-      content += "{} {} {}\n".format(start*fparam.MBE_SEGMENT_SHIFT_TEST*fparam.MBE_FRAME_SHIFT,
-                                     idx*fparam.MBE_SEGMENT_SHIFT_TEST*fparam.MBE_FRAME_SHIFT,
-                                     SPEECH_MUSIC_DIC_R[binaries[idx-1]])
-      start = idx
+      content += "%.3f %.3f %s\n" % (start*fparam.MBE_SEGMENT_SHIFT_TEST*fparam.MBE_FRAME_SHIFT,
+                                    (idx+1)*fparam.MBE_SEGMENT_SHIFT_TEST*fparam.MBE_FRAME_SHIFT,
+                                    SPEECH_MUSIC_DIC_R[binaries[idx-1]])
+      start = idx+1
 
+  if binaries[-1] == binaries[-2]:
+    content += "%.3f %.3f %s\n" % (start*fparam.MBE_SEGMENT_SHIFT_TEST*fparam.MBE_FRAME_SHIFT,
+                                  (binaries.size-1)*fparam.MBE_SEGMENT_SHIFT_TEST*fparam.MBE_FRAME_SHIFT,
+                                  SPEECH_MUSIC_DIC_R[binaries[-1]])
+  print(content)
   return content
 
 def MBEProbs2speech_music_labels(probs, context=2):
@@ -71,7 +76,7 @@ def MBEProbs2speech_music_labels(probs, context=2):
   apply median filter to probs and binary classification
   params:
     probs : list/tuple/np.array of probabilities
-    context : int, window size is 1 + 2*context
+    context : smoothed context size, int, window size is 1 + 2*context
   return content : string, label file content
   """
   # median smooth
@@ -83,22 +88,25 @@ def MBEProbs2speech_music_labels(probs, context=2):
 
   return labels
 
-def MBEProbs2speech_music_single(filepath, initial_probs, labelpath=None, context=2):
+def MBEProbs2speech_music_single(filepath, initial_probs, labelpath="", context=2):
   """
   speech/music classification to one single file with initial probabilities
   params:
     filepath : string, path of the audio
     initial_probs : initial prediction probs
     labelpath : string, path where to store the labels
+    context : smoothed context size, int, window size is 1 + 2*context
   """
-  # smooth the probs, post-procession
-  probs_smooth = medium_smooth(initial_probs)
 
-  # classification
-  binary = np.where(probs_smooth > 0.5, 1, 0)
+  # if labelpath is "", plot the resault
+  if labelpath == "":
+    # smooth the probs, post-procession
+    probs_smooth = medium_smooth(initial_probs)
 
-  # if labelpath is None, plot the resault
-  if labelpath is None:
+    # classification
+    binary = np.where(probs_smooth > 0.5, 1, 0)
+    print("Binaries: ", len(binary))
+
     # load wav
     _, wav = wavfile.read(filepath)
     if wav.ndim == 2:
@@ -124,6 +132,8 @@ def MBEProbs2speech_music_single(filepath, initial_probs, labelpath=None, contex
     plt.subplot(414)
     plt.title("classification")
     plt.plot(binary)
+
+    plt.show()
     return
 
   else:

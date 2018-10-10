@@ -35,9 +35,13 @@ def audio2MBE_inputs(path):
   extract mbe from one audion and transform feature into inputs of the network
   param path : string, audio path
   return inputs : list of np.ndarray, cut the log mbe feature into slices, [array1, array2, ...], arrayn
+  
+  Note:
+    This function only can be used for testing
   """
   inputs = []
   log_mbe = extractMBE(path)
+  print("Frames: ", len(log_mbe[0]))
 
   slices_num = int((log_mbe.shape[-1]-fparam.MBE_SEGMENT_LENGTH) / fparam.MBE_SEGMENT_SHIFT_TEST) + 1
   for i in list(range(slices_num)):
