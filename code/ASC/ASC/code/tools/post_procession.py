@@ -32,6 +32,31 @@ def medium_smooth(probs, context=2):
 
   return probs
 
+def medium_smooth_(probs, context=int(fparam.MBE_SEGMENT_LENGTH/fparam.MBE_SEGMENT_SHIFT_TEST)):
+  """
+  medium filter to smooth the probs
+  params:
+    probs : list/tuple/np.array of probabilities, probs in cumputed by tensorflow
+            the length of probs is the segments number
+    context : smoothed context size, only consider the left context
+  return:
+    tiny_probs : smoothed probs, this probs is for every segment shift time duration 
+  """
+  probs = np.asarray(probs, dtype=np.float32)
+
+  num_segments = probs.size
+
+  # compute how many tiny decision is made by the classifier, the tiny decision is made for every resolution time duration
+  num_tiny_decision = (num_segments-1) + context
+
+  # initialize the tiny probs for every tiny decision
+  tiny_probs = np.zeros(num_tiny_decision, dtype=np.float32)
+
+  for i in list(range(tiny_probs.size)):
+    tiny_probs[i] = probs[max(0, i-context//2) : min(num_tiny_decision, i+context//2)].mean()
+
+  return tiny_probs
+
 def median_smooth(classifications, context=2):
   """
   apply median filter to smooth the classification resaults
@@ -54,21 +79,21 @@ def MBEBinary2speech_music_labels(binaries):
   param binary : binary classification
   return content : string, label file content
   """
+  resolution = fparam.MBE_SEGMENT_SHIFT_TEST * fparam.MBE_FRAME_SHIFT
   binaries = np.asarray(binaries, dtype=np.int32)
   content = ""
   start = 0
   for idx in list(range(1, binaries.size)):
     if binaries[idx] != binaries[idx-1]:
-      content += "%.3f %.3f %s\n" % (start*fparam.MBE_SEGMENT_SHIFT_TEST*fparam.MBE_FRAME_SHIFT,
-                                    (idx+1)*fparam.MBE_SEGMENT_SHIFT_TEST*fparam.MBE_FRAME_SHIFT,
+      content += "%.3f %.3f %s\n" % (start*resolution,
+                                    (idx+1)*resolution,
                                     SPEECH_MUSIC_DIC_R[binaries[idx-1]])
       start = idx+1
 
   if binaries[-1] == binaries[-2]:
-    content += "%.3f %.3f %s\n" % (start*fparam.MBE_SEGMENT_SHIFT_TEST*fparam.MBE_FRAME_SHIFT,
-                                  (binaries.size-1)*fparam.MBE_SEGMENT_SHIFT_TEST*fparam.MBE_FRAME_SHIFT,
+    content += "%.3f %.3f %s\n" % (start*resolution,
+                                  (binaries.size)*resolution,
                                   SPEECH_MUSIC_DIC_R[binaries[-1]])
-  print(content)
   return content
 
 def MBEProbs2speech_music_labels(probs, context=2):
@@ -80,7 +105,8 @@ def MBEProbs2speech_music_labels(probs, context=2):
   return content : string, label file content
   """
   # median smooth
-  probs_smooth = medium_smooth(probs, context=context)
+  probs_smooth = medium_smooth_(probs)
+
   # binary classification 
   binaries = np.where(probs_smooth > 0.5, 1, 0)
   # binary to labels
@@ -101,11 +127,10 @@ def MBEProbs2speech_music_single(filepath, initial_probs, labelpath="", context=
   # if labelpath is "", plot the resault
   if labelpath == "":
     # smooth the probs, post-procession
-    probs_smooth = medium_smooth(initial_probs)
+    probs_smooth = medium_smooth_(initial_probs)
 
     # classification
     binary = np.where(probs_smooth > 0.5, 1, 0)
-    print("Binaries: ", len(binary))
 
     # load wav
     _, wav = wavfile.read(filepath)

@@ -144,7 +144,7 @@ def single_file_inference(filepath, labelpath=""):
     data = audio2MBE_inputs(filepath)
     probs = sess.run(probabilities, feed_dict={inputs : data})
 
-    MBEProbs2speech_music_single(filepath, probs, labelpath=labelpath, context=2)
+    MBEProbs2speech_music_single(filepath, probs, labelpath=labelpath)
 
 def batch_file_inference(wavdir, labeldir):
   """

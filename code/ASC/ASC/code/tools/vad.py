@@ -65,10 +65,8 @@ def vad(data, sr=16000, percent=27.0):
   framed = framing(data, win_size=int(sr*0.025), win_shift=int(sr*0.01)).copy()
   # Pre-emphasis filtering is applied after framing to be consistent with stream processing
   framed = pre_emphasis(framed, 0.97)
-  # print("framed.size: ", framed.size)
 
   log_energy = np.log((framed**2).sum(axis=1)+0.000000000000001)
-  # print("log_energy.size: ", log_energy.size)
 
   label, threshold = vad_percentil(log_energy, percent)
 

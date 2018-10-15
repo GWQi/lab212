@@ -100,7 +100,6 @@ def write_add_noise(srcfile, dstfile, noisefile, sr, segment=10.0, SNR=0):
   # add noise
   signal = add_noise(srcfile, noisefile, sr, segment, SNR=SNR)
 
-  print(signal.min())
   # write wav file
   wavfile.write(dstfile, sr, signal)
 
