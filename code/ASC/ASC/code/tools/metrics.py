@@ -106,3 +106,5 @@ def precision(truth_labels, pred_labels):
   error_rate = all_classification_error*1.0 / all_classification_num
   truth_rate = 1 - error_rate
   return truth_rate, error_rate
+
+

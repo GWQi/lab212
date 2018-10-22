@@ -10,8 +10,8 @@ import subprocess
 
 
 def check_format_index(url):
-	"""根据视频地址检查可用的音视频格式"""
-	
+    """根据视频地址检查可用的音视频格式"""
+    
     cmd_check_audio = "youtube-dl --proxy socks5://127.0.0.1:1080 -F " + url + " 2>&1|grep '^139' -m 1 | awk '{print $1}'"  # 检测音频格式索引
     cmd_check_video = "youtube-dl --proxy socks5://127.0.0.1:1080 -F " + url + " 2>&1|grep '^160' -m 1 | awk '{print $1}'"  # 检测视频格式索引
     audio_index = subprocess.check_output(cmd_check_audio, shell = True).strip()
@@ -38,10 +38,10 @@ def youtube_dl(index_file):
                 format_index = check_format_index(url)  # 获取可用的音视频格式索引
                 if format_index:
                     ext = '.mp4' if format_index == '160+139' else '.3gp'
-                    save_folder = './mp4/' + str(curr_folder)
+                    save_folder = os.path.join('.', 'mp4', curr_folder)
                     if succeed_counts == 1000:
                         sys.exit(1)  # 若完成任务数达到1000则退出程序
-                    save_name = save_folder + '/' + video_id + ext
+                    save_name = os.path.join(save_folder, video_id+ext)
                     cmd_download = 'youtube-dl --proxy socks5://127.0.0.1:1080 -f ' + format_index + ' ' + url + ' -i -o ' + save_name
                     return_code = subprocess.call(cmd_download, shell = True)
                     if not return_code:
@@ -57,7 +57,8 @@ def youtube_dl(index_file):
                             succeed_counts += 1
                             break
                         if failed_times == 4:  # 若当前任务连续四次抓取失败则跳过此任务
-                            subprocess.call('rm ./mp4/' + str(curr_folder) + '/'+ video_id + '*', shell = True)
+                            delete_files = os.path.join('.', 'mp4', str(curr_folder), video_id+'*')
+                            subprocess.call('rm ' + delete_files, shell = True)
                             break
                     time.sleep(0.5)
                 else:
