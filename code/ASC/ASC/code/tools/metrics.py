@@ -8,6 +8,7 @@
 # *************************************************
 import os
 import sys
+import argparse
 import numpy as np
 
 ASC_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -77,12 +78,13 @@ def label2array_pred(label_path, resolution, start, end):
     return array[int(start_pred/resolution)-int(start/resolution) :\
                  int(min(end, end_pred)/resolution)-int(start/resolution)]
 
-def precision(truth_labels, pred_labels):
+def precision(truth_labels, pred_labels, resolution):
   """
   compute classification precision
   params:
     truth_labels : directory where store the ground truth labels
     pred_labels : directory where store the predictions
+    resolution : float, decision resolution in seconds
   return:
     truth_rate : precision
     error_rate : error rate
@@ -95,8 +97,8 @@ def precision(truth_labels, pred_labels):
         truth_label_path = os.path.join(root, filename)
         pred_label_path = truth_label_path.replace(truth_labels, pred_labels)
         # truth label array
-        truth_array, start, end = label2array_truth(truth_label_path, resolution=0.01)
-        pred_array = label2array_pred(pred_label_path, start, end)
+        truth_array, start, end = label2array_truth(truth_label_path, resolution=resolution)
+        pred_array = label2array_pred(pred_label_path, resolution, start, end)
 
         valid_compare_samples = min(truth_array.size, pred_array.size)
 
@@ -107,4 +109,65 @@ def precision(truth_labels, pred_labels):
   truth_rate = 1 - error_rate
   return truth_rate, error_rate
 
+def precision_sigle(truth_label, pred_label, resolution):
+  """
+  compute classification precision
+  params:
+    truth_label : ground truth label path
+    pred_label : prediction label path
+    resolution : float, decision resolution in seconds
+  return:
+    truth_rate : float, precision
+    errer_rate : float, error rate
+  """
+  truth_array, start, end = label2array_truth(truth_label, resolution=resolution)
+  pred_array = label2array_pred(pred_label, resolution, start, end)
 
+  valid_compare_samples = min(truth_array.size, pred_array.size)
+
+  error_classification_num = (truth_array[:valid_compare_samples] != pred_array[:valid_compare_samples]).sum()
+
+  error_rate = error_classification_num * 1.0 / valid_compare_samples
+
+  truth_rate = 1 - error_rate
+
+  return truth_rate, error_rate
+
+def main():
+  usage =\
+  """
+usage: metrics.py [-h] [-b] [-t TRUTH] [-p PREDICTION]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -b, --batch           weather batch files
+  -t TRUTH, --truth TRUTH
+                        truth label file(directory) path
+  -p PREDICTION, --prediction PREDICTION
+                        prediction label file(directory) path
+  """
+
+  parser = argparse.ArgumentParser()
+  parser.add_argument("-b", "--batch", action="store_true", help="weather batch files")
+  parser.add_argument("-t", "--truth", type=str, default="", help="truth label file(directory) path")
+  parser.add_argument("-p", "--prediction", type=str, default="", help="prediction label file(directory) path")
+
+  args = parser.parse_args()
+
+  if args.truth == "":
+    print("Please specify your ground truth label file(directory)")
+    print(usage)
+    sys.exit(1)
+  if args.prediction == "":
+    print("Please specify your prediction label file(directory)")
+    print(usage)
+    sys.exit(1)
+  if args.batch:
+    truth_rate, error_rate = precision(args.truth, args.prediction, 0.01)
+    print("The precision is: %.4f" % truth_rate)
+  else:
+    truth_rate, error_rate = precision_sigle(args.truth, args.prediction, 0.01)
+    print("The precision is: %.4f" % truth_rate)
+
+if __name__ == "__main__":
+  main()
