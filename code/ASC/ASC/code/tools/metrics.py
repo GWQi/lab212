@@ -36,7 +36,7 @@ def label2array_truth(label_path, resolution=0.01):
   with open(label_path, 'r') as f:
     lines = f.readlines()
     start = float(lines[0].strip().split()[0])
-    end = float(lines[-1].strip().split()[0])
+    end = float(lines[-1].strip().split()[1])
 
     num_decisions = int(end/resolution) - int(start/resolution) + 1
 
@@ -64,7 +64,7 @@ def label2array_pred(label_path, resolution, start, end):
   with open(label_path, 'r') as f:
     lines = f.readlines()
     start_pred = float(lines[0].strip().split()[0])
-    end_pred = float(lines[-1].strip().split()[0])
+    end_pred = float(lines[-1].strip().split()[1])
 
     num_decisions = int(end_pred/resolution) - int(start_pred/resolution) + 1
     array = np.ones(num_decisions, dtype=np.int32)
@@ -75,8 +75,7 @@ def label2array_pred(label_path, resolution, start, end):
       array[int((float(start_)-start_pred)/resolution) : int((float(end_)-start_pred)/resolution)] =\
       universe.SPEECH_MUSIC_DIC.get(label, 1)
 
-    return array[int(start_pred/resolution)-int(start/resolution) :\
-                 int(min(end, end_pred)/resolution)-int(start/resolution)]
+    return array[int(start/resolution) : int(min(end, end_pred)/resolution)]
 
 def precision(truth_labels, pred_labels, resolution):
   """
@@ -103,8 +102,9 @@ def precision(truth_labels, pred_labels, resolution):
         valid_compare_samples = min(truth_array.size, pred_array.size)
 
         all_classification_num += valid_compare_samples
-        all_classification_error += (truth_array[:valid_compare_samples] != pred_array[:valid_compare_samples]).sum()
-
+        err_num = (truth_array[:valid_compare_samples] != pred_array[:valid_compare_samples]).sum()
+        all_classification_error += err_num
+        print(truth_label_path, pred_label_path, err_num, valid_compare_samples, all_classification_num, all_classification_error)
   error_rate = all_classification_error*1.0 / all_classification_num
   truth_rate = 1 - error_rate
   return truth_rate, error_rate

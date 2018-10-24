@@ -1,1 +1,4 @@
 This project is used to crawl wav files from website with scrapy.
+
+  ./wavCrawler -------------------------- 爬取喜马拉雅网站音频
+  ./audioset ---------------------------- 爬取audioset相关的youtube音频

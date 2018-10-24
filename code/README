@@ -8,9 +8,9 @@ project:
       python3
       scrapy
 
-  2.ASR. Audio scene recognization.
+  2.ASC. Audio scene recognization.
 
-    ASC Dependency packages:
+    ASC Dependency packages(Decision tree):
       python3
       librose
       python3-tk
@@ -20,6 +20,14 @@ project:
       sklearn
       pickle
       yaml
+    ASC Dependency packages(Convolution neural network):
+      python3
+      tensorflow-1.10
+      ffmpeg
+      numpy
+      librosa
+      matplotlib
+      pickle 
       
   3.SED. poly-Sound events dection
 

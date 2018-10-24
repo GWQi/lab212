@@ -8,6 +8,7 @@
 # *************************************************
 
 import os
+import numpy as np
 import librosa as lrs
 
 # extract mbe features
@@ -41,6 +42,8 @@ def audio2MBE_inputs(path):
   """
   inputs = []
   log_mbe = extractMBE(path)
+  zero_context = np.zeros((fparam.MBE_ORDER, int(fparam.MBE_SEGMENT_LENGTH//2)), dtype=log_mbe.dtype)
+  log_mbe = np.concatenate([zero_context, log_mbe, zero_context], axis=-1)
 
   slices_num = int((log_mbe.shape[-1]-fparam.MBE_SEGMENT_LENGTH) / fparam.MBE_SEGMENT_SHIFT_TEST) + 1
   for i in list(range(slices_num)):

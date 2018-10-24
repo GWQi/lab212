@@ -47,13 +47,13 @@ def medium_smooth_(probs, context=int(fparam.MBE_SEGMENT_LENGTH/fparam.MBE_SEGME
   num_segments = probs.size
 
   # compute how many tiny decision is made by the classifier, the tiny decision is made for every resolution time duration
-  num_tiny_decision = (num_segments-1) + context
+  num_tiny_decision = num_segments
 
   # initialize the tiny probs for every tiny decision
   tiny_probs = np.zeros(num_tiny_decision, dtype=np.float32)
 
   for i in list(range(tiny_probs.size)):
-    tiny_probs[i] = probs[max(0, i-context//2) : min(num_tiny_decision, i+context//2)].mean()
+    tiny_probs[i] = probs[max(0, int(i-context//2)) : min(num_segments, int(i+context//2))].mean()
 
   return tiny_probs
 

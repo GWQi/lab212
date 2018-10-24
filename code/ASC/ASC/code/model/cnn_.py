@@ -24,12 +24,12 @@ from ASC.code.tools.audio import audio2MBE_inputs
 from ASC.code.tools.post_procession import MBEProbs2speech_music_single
 from ASC.code.tools.utils import reconstruct
 
-MODEL_ROOT = '/home/guwenqi/Documents/ASC/train/model/cnn/classical'
+MODEL_ROOT = 'G:\\guwenqi\\datasets\\SED\\ASC\\train\\model\\cnn\\classical'
 checkpoint_prefix = os.path.join(MODEL_ROOT, 'ckpt')
 
-DATA_ROOT = '/home/guwenqi/Documents/ASC/train/feature/mbe_feature'
-LABELS_PATH = '/home/guwenqi/Documents/ASC/train/feature/mbe_feature/label.txt'
-logfile = '/home/guwenqi/Documents/ASC/train/log/log.txt'
+DATA_ROOT = 'G:\\guwenqi\\datasets\\SED\\ASC\\train\\feature\\mbe_feature'
+LABELS_PATH = 'G:\\guwenqi\\datasets\\SED\\ASC\\train\\feature\\mbe_feature\\label.txt'
+logfile = 'G:\\guwenqi\\datasets\\SED\\ASC\\train\\log\\log.txt'
 
 
 def CNN(inputs, is_training):
@@ -136,7 +136,7 @@ def single_file_inference(filepath, labelpath=""):
   with tf.Session() as sess:
     try:
       with open(os.path.join(MODEL_ROOT, 'checkpoint'), 'r') as f:
-        last_checkpoint = f.readline().strip().split()[-1].strip('"')
+        last_checkpoint = f.readline().strip().split()[-1].strip('"').replace("\\\\", '/')
         saver.restore(sess, last_checkpoint)
     except:
       raise IOError("can not restore the checkpoint file: {}".format(last_checkpoint))
@@ -163,16 +163,16 @@ def batch_file_inference(wavdir, labeldir):
   with tf.Session() as sess:
     try:
       with open(os.path.join(MODEL_ROOT, 'checkpoint'), 'r') as f:
-        last_checkpoint = f.readline().strip().split()[-1].strip('"')
+        last_checkpoint = f.readline().strip().split()[-1].strip('"').replace("\\\\", '/')
         saver.restore(sess, last_checkpoint)
     except:
       raise IOError("can not restore the checkpoint file: {}".format(last_checkpoint))
-  
+
     for root, dirlist, filelist in os.walk(wavdir):
       for filename in filelist:
         if filename.endswith(".wav"):
           filepath = os.path.join(root, filename)
-          print(filepath + " done!")
+          print(filepath + " labeling!")
 
           basename = filename.split('.')[0]
           labelpath = os.path.join(root, basename+'.lab').replace(wavdir, labeldir)
@@ -188,7 +188,8 @@ def train():
   asciter = ASCDataIterator()
   try:
     asciter.load(os.path.join(MODEL_ROOT, 'ASCDataIterator.ckpt'))
-  except:
+  except Exception:
+    print(Exception)
     asciter.configure(DATA_ROOT, LABELS_PATH)
 
   # logger configuration
@@ -230,9 +231,10 @@ def train():
   with tf.Session(graph=g_train) as sess:
     try:
       with open(os.path.join(MODEL_ROOT, 'checkpoint'), 'r') as f:
-        last_checkpoint = f.readline().strip().split()[-1].strip('"')
+        last_checkpoint = f.readline().strip().split()[-1].strip('"').replace("\\\\", '/')
         saver.restore(sess, last_checkpoint)
-    except:
+    except Exception:
+      print("There is no preserved model!")
       tf.global_variables_initializer().run()
 
     print('Begain training')
@@ -308,6 +310,20 @@ def train():
         break
 
 def main():
+  usage =\
+  """
+usage: cnn_.py [-h] [-t {train,infer}] [-s SOURCE] [-l LABEL] [-b]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t {train,infer}, --task {train,infer}
+                        train or inference
+  -s SOURCE, --source SOURCE
+                        source wav file(s) path
+  -l LABEL, --label LABEL
+                        path where to save label files
+  -b, --batch
+  """
 
   parser = argparse.ArgumentParser()
   parser.add_argument("-t", "--task",     type=str,   choices=["train", "infer"], help="train or inference")
@@ -320,12 +336,17 @@ def main():
   if args.task == "train":
     train()
   elif args.task == "infer":
+    if args.source == "" or args.label == "":
+      print("You must specify source files(directory) and label files(directory)!")
+      print(usage)
+      sys.exit(1)
     if args.batch:
       batch_file_inference(args.source, args.label)
     else:
       single_file_inference(args.source, args.label)
   else:
     print("You must specify one task!")
+    print(usage)
     sys.exit(-1)
 
 
